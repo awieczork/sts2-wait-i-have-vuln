@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <Sts2InstallDir>C:\Steam\steamapps\common\Slay the Spire 2</Sts2InstallDir>
+    <Sts2DataDir>$(Sts2InstallDir)\data_sts2_windows_x86_64</Sts2DataDir>
+    <Sts2ModsDir>$(Sts2InstallDir)\mods\$(MSBuildProjectName)</Sts2ModsDir>
+  </PropertyGroup>
+</Project>

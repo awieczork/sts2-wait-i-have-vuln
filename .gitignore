@@ -426,3 +426,17 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+#
+.github/context
+
+# Local game path configuration and Godot-generated files
+Directory.Build.props
+.godot/
+**/.godot/
+
+# Optional decompiled game references
+decompiled/
+references/
+!/.github/skills/publish/
+!/.github/skills/publish/references/
