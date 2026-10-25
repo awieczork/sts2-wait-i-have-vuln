@@ -4,8 +4,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <AssemblyName>CoopVulnIndicator</AssemblyName>
-    <RootNamespace>CoopVulnIndicator</RootNamespace>
+    <AssemblyName>WaitIHaveVuln</AssemblyName>
+    <RootNamespace>WaitIHaveVuln</RootNamespace>
     <PlatformTarget>x64</PlatformTarget>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <DeployMod Condition="'$(DeployMod)' == ''">false</DeployMod>
@@ -26,6 +26,10 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+  </ItemGroup>
+
   <Target Name="ValidateGameReferences" BeforeTargets="ResolveReferences" Condition="'$(DesignTimeBuild)' != 'true'">
     <Error Condition="!Exists('$(Sts2DataDir)\sts2.dll')" Text="Required game assembly not found: $(Sts2DataDir)\sts2.dll. Set Sts2InstallDir in Directory.Build.props." />
     <Error Condition="!Exists('$(Sts2DataDir)\GodotSharp.dll')" Text="Required game assembly not found: $(Sts2DataDir)\GodotSharp.dll. Set Sts2InstallDir in Directory.Build.props." />
@@ -42,9 +46,9 @@
     <Error Condition="'$(Sts2ModsDir)' == ''" Text="Deployment requires Sts2ModsDir to be the project folder under the game's mods directory." />
     <Error Condition="'$(_ActualSts2ModsDir)' != '$(_ExpectedSts2ModsDir)'" Text="Sts2ModsDir must be the project folder directly under '$(Sts2InstallDir)\mods'. Refusing deployment to '$(_ActualSts2ModsDir)'." />
     <Error Condition="!Exists('$(TargetPath)')" Text="Built mod assembly not found: $(TargetPath)." />
-    <Error Condition="!Exists('$(MSBuildProjectDirectory)\mod_manifest.json')" Text="Source manifest not found: $(MSBuildProjectDirectory)\mod_manifest.json." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\WaitIHaveVuln.json')" Text="Source manifest not found: $(MSBuildProjectDirectory)\WaitIHaveVuln.json." />
     <MakeDir Directories="$(Sts2ModsDir)" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(Sts2ModsDir)" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\mod_manifest.json" DestinationFiles="$(Sts2ModsDir)\$(AssemblyName).json" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\WaitIHaveVuln.json" DestinationFiles="$(Sts2ModsDir)\$(AssemblyName).json" />
   </Target>
 </Project>

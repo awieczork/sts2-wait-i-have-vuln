@@ -1,8 +1,8 @@
 {
-    "id": "CoopVulnIndicator",
-    "name": "Co-op Vulnerable Indicator",
+    "id": "WaitIHaveVuln",
+    "name": "wait-i-have-vuln",
     "author": "REPLACE_WITH_AUTHOR",
-    "description": "Minimal initializer for a co-op quality-of-life mod.",
+    "description": "Shows a Vulnerable icon on co-op rows when a supported card is in hand.",
     "version": "0.1.0",
     "min_game_version": "0.107.1",
     "has_pck": false,

@@ -7,7 +7,7 @@
             "command": "dotnet",
             "args": [
                 "build",
-                "${workspaceFolder}\\CoopVulnIndicator.csproj",
+                "${workspaceFolder}\\WaitIHaveVuln.csproj",
                 "--no-restore"
             ],
             "options": {
@@ -25,7 +25,7 @@
             "command": "dotnet",
             "args": [
                 "build",
-                "${workspaceFolder}\\CoopVulnIndicator.csproj",
+                "${workspaceFolder}\\WaitIHaveVuln.csproj",
                 "--no-restore",
                 "-p:DeployMod=true"
             ],
@@ -40,7 +40,7 @@
             "command": "dotnet",
             "args": [
                 "clean",
-                "${workspaceFolder}\\CoopVulnIndicator.csproj"
+                "${workspaceFolder}\\WaitIHaveVuln.csproj"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
