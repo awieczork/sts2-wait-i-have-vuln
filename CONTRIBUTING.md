@@ -37,6 +37,7 @@ The workspace recommends Microsoft's C# extension, but no editor extension is re
 - `src/Indicator/MultiplayerVulnerableIndicator.cs` owns row-level UI and lifecycle integration.
 - `src/Indicator/VulnerableIndicatorState.cs` contains the engine-independent eligibility predicate and hand state.
 - `tests/RegressionHarness/WaitIHaveVuln.RegressionHarness.csproj` links the production state source into the fake-hand regression harness.
+- `scripts/copy-vanilla-saves.ps1` and `scripts/copy-vanilla-saves.sh` are player-facing helpers that back up the account save folder and copy a normal profile's progress into the matching modded profile; the README describes their use. They are not part of the mod payload. They were checked against a fake save tree under PowerShell 7, Windows PowerShell 5.1, and Git Bash, not against real game saves.
 
 The project references the installed game assemblies `sts2.dll`, `GodotSharp.dll`, and `0Harmony.dll` from `Sts2DataDir`.
 Those references are non-copy-local and are not deployment dependencies.
@@ -100,6 +101,21 @@ The VS Code task `build and deploy mod` runs the same opt-in operation.
 The project verifies that `Sts2ModsDir` is exactly `mods\WaitIHaveVuln` beneath `Sts2InstallDir`.
 It copies only `WaitIHaveVuln.dll` and `WaitIHaveVuln.json` to that folder; game assemblies and Godot bindings are not copied.
 
+### Solo test row
+
+For local testing without a co-op session, build with the opt-in `SoloTestRow` property, which defaults to `false`:
+
+```powershell
+dotnet build .\WaitIHaveVuln.csproj --no-restore -p:DeployMod=true -p:SoloTestRow=true
+```
+
+The VS Code task `build and deploy mod (solo test row)` runs the same operation.
+This defines `SOLO_TEST_ROW`, which lets the game create the local player's co-op row in single-player runs and treats a missing lobby as connected, so the indicator can be checked on that row.
+Without a lobby, the test row's nameplate shows the local platform player name instead of the net id.
+The log then also contains `[WaitIHaveVuln] Solo test row enabled (test build).`.
+A test build changes single-player presentation and must not be distributed; rebuild and redeploy without the property to restore the regular build.
+It does not exercise remote hands, host/join, or reconnect behavior.
+
 The internal identity change does not remove an older `CoopVulnIndicator` installation.
 Do not enable both identities at once, and do not delete or modify game files based on this guide.
 
@@ -108,7 +124,8 @@ After an explicit deployment, enable the mod in Settings > Mod Settings and rest
 Check `%APPDATA%\SlayTheSpire2\logs\godot.log` for `[WaitIHaveVuln] Mod initialized.`.
 That message confirms the initializer installed the Harmony patches; it does not verify that the icon loaded or rendered correctly.
 
-The current indicator candidate has not been deployed or accepted in-game.
+The solo test row has been checked in-game for icon loading, row fit, Bash draw/play transitions, and the speech bubble.
+Joining an unmodded co-op host succeeds with a logged non-gameplay mod mismatch warning; hosting with the mod and reconnects have not been checked.
 Compile and harness success are not substitutes for runtime, resource, layout, host/join, or reconnect checks.
 
 ## Clean and release procedures
