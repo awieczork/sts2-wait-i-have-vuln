@@ -23,12 +23,12 @@ Assassinate, Bash, Beam Cell, Break, Comet, Dominate, Expose, Falling Star, Fear
 
 ### From Steam Workshop (recommended)
 
-1. Open the mod's Steam Workshop page and click **Subscribe**.
+1. Open the mod's [Steam Workshop page](https://steamcommunity.com/sharedfiles/filedetails/?id=3831970006) and click **Subscribe**. The item is visible to Limoonene's Steam friends.
 2. Start Slay the Spire 2. Steam downloads the mod and keeps it updated.
 
 ### Manually
 
-1. Download `wait-i-have-vuln-v<version>.zip`.
+1. Download `wait-i-have-vuln-v<version>.zip` from the [latest release](https://github.com/awieczork/sts2-wait-i-have-vuln/releases/latest).
 2. Create the folder `mods\WaitIHaveVuln` inside your game folder. Usually this is `C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2\mods\WaitIHaveVuln`. In Steam, you can find the game folder with **right-click the game > Manage > Browse local files**.
 3. Put `WaitIHaveVuln.dll` and `WaitIHaveVuln.json` from the ZIP into that folder.
 
