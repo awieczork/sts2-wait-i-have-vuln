@@ -1,9 +1,11 @@
 using System.Runtime.CompilerServices;
 using Godot;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
+using MegaCrit.Sts2.Core.Nodes.Vfx;
 using MegaCrit.Sts2.Core.Runs;
 
 namespace WaitIHaveVuln.Indicator;
@@ -29,6 +31,13 @@ internal static class MultiplayerPlayerStateIndicators
     private static bool IsConnected(NMultiplayerPlayerState row)
     {
         var lobby = RunManager.Instance.RunLobby;
+#if SOLO_TEST_ROW
+        // Single-player runs have no lobby; the solo test row is always connected.
+        if (lobby is null)
+        {
+            return true;
+        }
+#endif
         return lobby is not null && lobby.ConnectedPlayerIds.Contains(row.Player.NetId);
     }
 
@@ -77,9 +86,11 @@ internal static class MultiplayerPlayerStateIndicators
 
     private sealed class RowIndicator : IDisposable
     {
-        private const float IconSize = 24f;
+        private const float IconSize = 16f;
         private const float Gap = 6f;
         private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
+        private const string SpeechText = "Wait! I have vuln!";
+        private const double SpeechSeconds = 4.0;
         private static bool _textureLoadAttempted;
         private static Texture2D? _vulnerableTexture;
         private readonly NMultiplayerPlayerState _row;
@@ -177,6 +188,7 @@ internal static class MultiplayerPlayerStateIndicators
                     return;
                 }
 
+                ShowSpeechBubble();
                 var texture = LoadVulnerableTexture();
                 if (texture is null)
                 {
@@ -210,6 +222,23 @@ internal static class MultiplayerPlayerStateIndicators
             }
 
             _icon = null;
+        }
+
+        private void ShowSpeechBubble()
+        {
+            var creature = _row.Player.Creature;
+            if (creature.IsDead)
+            {
+                return;
+            }
+
+            var bubble = NSpeechBubbleVfx.Create(SpeechText, creature, SpeechSeconds, VfxColor.White);
+            if (bubble is null)
+            {
+                return;
+            }
+
+            creature.GetVfxContainer()?.AddChildSafely(bubble);
         }
 
         private void UpdateIconPosition()
