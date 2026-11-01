@@ -1,8 +1,8 @@
 {
     "id": "WaitIHaveVuln",
     "name": "wait-i-have-vuln",
-    "author": "REPLACE_WITH_AUTHOR",
-    "description": "Shows a Vulnerable icon on co-op rows when a supported card is in hand.",
+    "author": "Limoonene",
+    "description": "Co-op: shows a Vulnerable icon and a speech bubble when a player has a card that applies Vulnerable in hand.",
     "version": "0.1.0",
     "min_game_version": "0.107.1",
     "has_pck": false,
