@@ -1,11 +1,11 @@
 # Contributing
 
-This guide prepares a Windows x64 development machine for this private repository and records its local build, test, and optional deployment procedures.
+This guide prepares a Windows x64 development machine for this repository and records its local build, test, and optional deployment procedures.
 Run PowerShell commands from the repository root unless noted otherwise.
 
 ## Prepare a machine
 
-1. Obtain authorized access to the private repository, clone it with your approved Git method, and open the repository root in your editor.
+1. Clone the repository with `git clone https://github.com/awieczork/sts2-wait-i-have-vuln.git` and open the repository root in your editor.
 2. Install the .NET 9 SDK; the .NET runtime alone cannot build the project.
 3. Install Slay the Spire 2 locally and locate its managed assemblies under `data_sts2_windows_x86_64`.
 4. Inspect `Directory.Build.props.example` and create the ignored local `Directory.Build.props` only when it does not already exist:
@@ -86,7 +86,7 @@ It does not transfer the ignored machine-local `Directory.Build.props`, generate
 The workspace extension recommendation does not install an extension; VS Code extensions and personal Copilot plugins belong to a user profile, not this repository.
 
 Do not put secrets, access tokens, Steam account information, game binaries or assets, decompiled game content, or save files in tracked documentation or configuration.
-Private repository access does not make the repository a secret store.
+The repository is public, so everything committed to it is visible to everyone.
 
 ## Optional deployment and load check
 
@@ -139,4 +139,3 @@ dotnet clean .\WaitIHaveVuln.csproj
 Clean does not remove deployed mod files.
 Use the [commit workflow](.github/skills/commit/SKILL.md) for reviewed local commits and the [publish workflow](.github/skills/publish/SKILL.md) for tagged releases.
 Player-facing changes belong in [CHANGELOG.md](CHANGELOG.md).
-The manifest author is still `REPLACE_WITH_AUTHOR`; the owner must provide the correct identity before distribution.

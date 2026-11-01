@@ -115,3 +115,8 @@ You can also just turn it off in **Settings > Mod Settings**.
 
 Build, test, and release instructions are in [CONTRIBUTING.md](CONTRIBUTING.md).
 Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+[MIT](LICENSE) © Limoonene.
+Slay the Spire 2 and its assets belong to Mega Crit; this repository contains no game files.
