@@ -1,4 +1,6 @@
 <Project Sdk="Godot.NET.Sdk/4.5.1">
+  <Import Project="Sts2PathDiscovery.props" />
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -30,12 +32,14 @@
 
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
+    <!-- Test-only patches ship only in solo test row builds. -->
+    <Compile Remove="src/Testing/**/*.cs" Condition="'$(SoloTestRow)' != 'true'" />
   </ItemGroup>
 
   <Target Name="ValidateGameReferences" BeforeTargets="ResolveReferences" Condition="'$(DesignTimeBuild)' != 'true'">
-    <Error Condition="!Exists('$(Sts2DataDir)\sts2.dll')" Text="Required game assembly not found: $(Sts2DataDir)\sts2.dll. Set Sts2InstallDir in Directory.Build.props." />
-    <Error Condition="!Exists('$(Sts2DataDir)\GodotSharp.dll')" Text="Required game assembly not found: $(Sts2DataDir)\GodotSharp.dll. Set Sts2InstallDir in Directory.Build.props." />
-    <Error Condition="!Exists('$(Sts2DataDir)\0Harmony.dll')" Text="Required game assembly not found: $(Sts2DataDir)\0Harmony.dll. Set Sts2InstallDir in Directory.Build.props." />
+    <Error Condition="'$(Sts2DataDir)' == '' or !Exists('$(Sts2DataDir)\sts2.dll')" Text="Could not find sts2.dll under '$(Sts2DataDir)'. Set Sts2InstallDir in Directory.Build.props (copy Directory.Build.props.example) or pass -p:Sts2InstallDir=&lt;game folder&gt;; auto-discovery checks the Steam registry and the default Steam library." />
+    <Error Condition="'$(Sts2DataDir)' != '' and !Exists('$(Sts2DataDir)\GodotSharp.dll')" Text="Required game assembly not found: $(Sts2DataDir)\GodotSharp.dll." />
+    <Error Condition="'$(Sts2DataDir)' != '' and !Exists('$(Sts2DataDir)\0Harmony.dll')" Text="Required game assembly not found: $(Sts2DataDir)\0Harmony.dll." />
   </Target>
 
   <Target Name="DeployMod" AfterTargets="Build" Condition="'$(DeployMod)' == 'true' and '$(DesignTimeBuild)' != 'true'">
@@ -44,7 +48,7 @@
       <_ExpectedSts2ModsDir>$([System.IO.Path]::GetFullPath('$(_Sts2InstallDirFull)\mods\$(MSBuildProjectName)'))</_ExpectedSts2ModsDir>
       <_ActualSts2ModsDir>$([System.IO.Path]::GetFullPath('$(Sts2ModsDir)'))</_ActualSts2ModsDir>
     </PropertyGroup>
-    <Error Condition="'$(Sts2InstallDir)' == '' or !Exists('$(Sts2InstallDir)\data_sts2_windows_x86_64\sts2.dll')" Text="Deployment requires a valid Slay the Spire 2 install at Sts2InstallDir: '$(Sts2InstallDir)'." />
+    <Error Condition="'$(Sts2InstallDir)' == '' or !Exists('$(Sts2DataDir)\sts2.dll')" Text="Deployment requires a valid Slay the Spire 2 install at Sts2InstallDir: '$(Sts2InstallDir)'." />
     <Error Condition="'$(Sts2ModsDir)' == ''" Text="Deployment requires Sts2ModsDir to be the project folder under the game's mods directory." />
     <Error Condition="'$(_ActualSts2ModsDir)' != '$(_ExpectedSts2ModsDir)'" Text="Sts2ModsDir must be the project folder directly under '$(Sts2InstallDir)\mods'. Refusing deployment to '$(_ActualSts2ModsDir)'." />
     <Error Condition="!Exists('$(TargetPath)')" Text="Built mod assembly not found: $(TargetPath)." />

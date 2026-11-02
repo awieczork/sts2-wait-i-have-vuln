@@ -1,7 +1,10 @@
 <Project>
+  <!--
+    Optional local override. Copy this file to Directory.Build.props (ignored by Git) only when the build
+    cannot find the game on its own, and point Sts2InstallDir at your Slay the Spire 2 folder
+    (Steam: right-click the game > Manage > Browse local files). Do not put quotes around the path.
+  -->
   <PropertyGroup>
-    <Sts2InstallDir>C:\Steam\steamapps\common\Slay the Spire 2</Sts2InstallDir>
-    <Sts2DataDir>$(Sts2InstallDir)\data_sts2_windows_x86_64</Sts2DataDir>
-    <Sts2ModsDir>$(Sts2InstallDir)\mods\$(MSBuildProjectName)</Sts2ModsDir>
+    <Sts2InstallDir>C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2</Sts2InstallDir>
   </PropertyGroup>
 </Project>

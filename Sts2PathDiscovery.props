@@ -1,0 +1,20 @@
+<Project>
+  <!--
+    Finds the Slay the Spire 2 install when Sts2InstallDir is not already set
+    (in the ignored Directory.Build.props or with -p:Sts2InstallDir=...).
+    Order: Steam's own library from the registry, the game's uninstall entry, the default Steam library.
+    Derived paths are filled in only when they are empty, so a local override wins.
+  -->
+  <PropertyGroup Condition="'$(Sts2InstallDir)' == '' and '$(OS)' == 'Windows_NT'">
+    <_SteamPath>$([MSBuild]::GetRegistryValueFromView('HKEY_CURRENT_USER\Software\Valve\Steam', 'SteamPath', null, RegistryView.Default))</_SteamPath>
+    <Sts2InstallDir Condition="'$(_SteamPath)' != '' and Exists('$(_SteamPath)\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64\sts2.dll')">$(_SteamPath)\steamapps\common\Slay the Spire 2</Sts2InstallDir>
+    <_Sts2UninstallLocation>$([MSBuild]::GetRegistryValueFromView('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 2868840', 'InstallLocation', null, RegistryView.Registry64, RegistryView.Registry32))</_Sts2UninstallLocation>
+    <Sts2InstallDir Condition="'$(Sts2InstallDir)' == '' and '$(_Sts2UninstallLocation)' != '' and Exists('$(_Sts2UninstallLocation)\data_sts2_windows_x86_64\sts2.dll')">$(_Sts2UninstallLocation)</Sts2InstallDir>
+    <Sts2InstallDir Condition="'$(Sts2InstallDir)' == '' and Exists('C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64\sts2.dll')">C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2</Sts2InstallDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Sts2InstallDir)' != ''">
+    <Sts2DataDir Condition="'$(Sts2DataDir)' == ''">$(Sts2InstallDir)\data_sts2_windows_x86_64</Sts2DataDir>
+    <Sts2ModsDir Condition="'$(Sts2ModsDir)' == ''">$(Sts2InstallDir)\mods\$(MSBuildProjectName)</Sts2ModsDir>
+  </PropertyGroup>
+</Project>
