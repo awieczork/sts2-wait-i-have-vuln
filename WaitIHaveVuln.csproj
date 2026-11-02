@@ -11,8 +11,6 @@
     <PlatformTarget>x64</PlatformTarget>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <DeployMod Condition="'$(DeployMod)' == ''">false</DeployMod>
-    <SoloTestRow Condition="'$(SoloTestRow)' == ''">false</SoloTestRow>
-    <DefineConstants Condition="'$(SoloTestRow)' == 'true'">$(DefineConstants);SOLO_TEST_ROW</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -32,8 +30,6 @@
 
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
-    <!-- Test-only patches ship only in solo test row builds. -->
-    <Compile Remove="src/Testing/**/*.cs" Condition="'$(SoloTestRow)' != 'true'" />
   </ItemGroup>
 
   <Target Name="ValidateGameReferences" BeforeTargets="ResolveReferences" Condition="'$(DesignTimeBuild)' != 'true'">

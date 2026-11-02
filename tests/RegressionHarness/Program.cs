@@ -1,4 +1,5 @@
 using WaitIHaveVuln.Indicator;
+using WaitIHaveVuln.Settings;
 
 namespace WaitIHaveVuln.RegressionHarness;
 
@@ -11,7 +12,10 @@ internal static class Program
         VerifyRebindingAndCombatEnd,
         VerifyInterruptedTracking,
         VerifyOwnerCleanup,
-        VerifyLocalAndRemoteRows
+        VerifyLocalAndRemoteRows,
+        VerifySettingsParsing,
+        VerifyIndicatorVisibilityRule,
+        VerifySettingsStore
     };
 
     private static int _assertions;
@@ -229,6 +233,88 @@ internal static class Program
 
         local.Dispose();
         remote.Dispose();
+    }
+
+    private static void VerifySettingsParsing()
+    {
+        var defaults = PlayerSettings.Default;
+        Assert(defaults == new PlayerSettings(100, true, true), "Defaults are 100% icon, bubble on, own row on.");
+
+        Assert(PlayerSettings.TryParse("""{"iconScalePercent":150,"showBubble":false,"showOnOwnRow":false}""", out var full)
+            && full == new PlayerSettings(150, false, false), "A complete file is read as written.");
+        Assert(PlayerSettings.TryParse("{}", out var empty) && empty == defaults, "Missing fields take their defaults.");
+        Assert(PlayerSettings.TryParse("""{"iconScalePercent":10}""", out var low) && low.IconScalePercent == 50, "A scale below the range clamps to 50%.");
+        Assert(PlayerSettings.TryParse("""{"iconScalePercent":1e9}""", out var high) && high.IconScalePercent == 150, "A scale above the range clamps to 150%.");
+        Assert(PlayerSettings.TryParse("""{"iconScalePercent":200}""", out var oldTop) && oldTop.IconScalePercent == 150, "The former 200% top clamps to 150%.");
+        Assert(PlayerSettings.TryParse("""{"iconScalePercent":1e400}""", out var beyond) && beyond.IconScalePercent == 150, "A number beyond double's range clamps to 150%.");
+        Assert(PlayerSettings.TryParse("""{"iconScalePercent":-1e400}""", out var below) && below.IconScalePercent == 50, "A negative number beyond double's range clamps to 50%.");
+        Assert(PlayerSettings.TryParse("""{"iconScalePercent":134}""", out var down) && down.IconScalePercent == 130, "A scale snaps down to its step.");
+        Assert(PlayerSettings.TryParse("""{"iconScalePercent":125}""", out var mid) && mid.IconScalePercent == 130, "A scale halfway between steps rounds up.");
+        Assert(PlayerSettings.TryParse("""{"iconScalePercent":"big","showBubble":1,"showOnOwnRow":null}""", out var wrong) && wrong == defaults,
+            "Wrong-typed fields take their defaults.");
+        Assert(PlayerSettings.TryParse("""{"version":7,"future":[1,2],"showBubble":false}""", out var unknown) && unknown == defaults with { ShowBubble = false },
+            "Unknown fields are ignored and known fields still read.");
+
+        foreach (var damaged in new[] { "", "not json", "[1,2]", "\"text\"", "{\"showBubble\":" })
+        {
+            Assert(!PlayerSettings.TryParse(damaged, out var fallback) && fallback == defaults, $"'{damaged}' is damaged and gives the defaults.");
+        }
+
+        var written = new PlayerSettings(70, false, true);
+        Assert(PlayerSettings.TryParse(written.ToJson(), out var roundTrip) && roundTrip == written, "Written settings read back unchanged.");
+        Assert(new PlayerSettings(-5, true, true).Normalize().IconScalePercent == 50, "Normalize clamps a scale set in code.");
+        Assert(Math.Abs(new PlayerSettings(150, true, true).IconScale - 1.5f) < 0.0001f, "The icon scale is the percent as a factor.");
+    }
+
+    private static void VerifyIndicatorVisibilityRule()
+    {
+        var shown = PlayerSettings.Default;
+        var ownRowOff = shown with { ShowOnOwnRow = false };
+
+        Assert(!shown.ShowsIndicator(false, false) && !shown.ShowsIndicator(false, true), "No qualifying card shows nothing on any row.");
+        Assert(shown.ShowsIndicator(true, false) && shown.ShowsIndicator(true, true), "By default both your row and teammates' rows show the indicator.");
+        Assert(!ownRowOff.ShowsIndicator(true, true), "With the own row off, your own row shows nothing.");
+        Assert(ownRowOff.ShowsIndicator(true, false), "With the own row off, teammates' rows still show the indicator.");
+    }
+
+    private static void VerifySettingsStore()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"WaitIHaveVuln.Harness.{Guid.NewGuid():N}");
+        try
+        {
+            var store = new SettingsStore(Path.Combine(directory, "nested"));
+            Assert(store.Load(out var missing) == SettingsLoadOutcome.Missing && missing == PlayerSettings.Default, "A missing file gives the defaults.");
+            Assert(!Directory.Exists(Path.Combine(directory, "nested")), "Loading a missing file writes nothing.");
+
+            var saved = new PlayerSettings(140, false, true);
+            store.Save(saved);
+            Assert(store.Load(out var loaded) == SettingsLoadOutcome.Loaded && loaded == saved, "Saved settings load back, creating the directory.");
+            Assert(!File.Exists(store.FilePath + ".tmp"), "Saving leaves no temporary file.");
+
+            store.Save(saved with { ShowBubble = true });
+            Assert(store.Load(out var replaced) == SettingsLoadOutcome.Loaded && replaced.ShowBubble, "A second save replaces the first.");
+
+            File.WriteAllText(store.FilePath + ".tmp", "half-written");
+            Assert(store.Load(out var withLeftover) == SettingsLoadOutcome.Loaded && withLeftover.ShowBubble, "A leftover temporary file does not affect loading.");
+            store.Save(saved);
+            Assert(store.Load(out var afterLeftover) == SettingsLoadOutcome.Loaded && afterLeftover == saved, "Saving over a leftover temporary file succeeds.");
+
+            File.WriteAllText(store.FilePath, "{ damaged");
+            Assert(store.Load(out var damaged) == SettingsLoadOutcome.Damaged && damaged == PlayerSettings.Default, "A damaged file gives the defaults.");
+            Assert(!File.Exists(store.FilePath) && File.ReadAllText(store.DamagedFilePath) == "{ damaged", "A damaged file is moved aside unchanged.");
+
+            File.WriteAllText(store.FilePath, "still damaged");
+            Assert(store.Load(out _) == SettingsLoadOutcome.Damaged && File.ReadAllText(store.DamagedFilePath) == "still damaged",
+                "A newer damaged file replaces an older .bad file.");
+            Assert(store.Load(out _) == SettingsLoadOutcome.Missing, "After moving a damaged file aside, the next load finds no file.");
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
     }
 
     private static HandIndicatorState<FakeCard> CreateState(Action<bool> setVisible)

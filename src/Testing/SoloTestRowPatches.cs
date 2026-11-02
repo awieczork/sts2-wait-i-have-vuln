@@ -1,5 +1,5 @@
-// Test builds only. This file is compiled when the build runs with -p:SoloTestRow=true,
-// which also defines SOLO_TEST_ROW. It changes single-player presentation and must never ship.
+// Patches behind the "Solo mode [dev]" testing aid. They ship in every build but change
+// single-player presentation only while SoloMode.Enabled is on, which it never is at game start.
 using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
@@ -8,11 +8,13 @@ using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
 using MegaCrit.Sts2.Core.Platform;
 using MegaCrit.Sts2.Core.Runs;
+using WaitIHaveVuln.Settings;
 
 namespace WaitIHaveVuln.Testing;
 
 // The container returns early unless the run has more than one player.
-// Lowering that threshold to zero creates the local player's row in single-player runs.
+// The threshold becomes a call that returns zero while solo mode is on, which creates the
+// local player's row in single-player runs, and the game's own 1 otherwise.
 [HarmonyPatch(typeof(NMultiplayerPlayerStateContainer), nameof(NMultiplayerPlayerStateContainer.Initialize))]
 internal static class MultiplayerPlayerStateContainerSoloTestRowPatch
 {
@@ -26,12 +28,14 @@ internal static class MultiplayerPlayerStateContainerSoloTestRowPatch
                 && codes[i].opcode == OpCodes.Ldc_I4_1
                 && (codes[i + 1].opcode == OpCodes.Bgt_S || codes[i + 1].opcode == OpCodes.Bgt))
             {
-                codes[i].opcode = OpCodes.Ldc_I4_0;
+                // Changed in place, so labels and exception blocks on the instruction stay attached.
+                codes[i].opcode = OpCodes.Call;
+                codes[i].operand = AccessTools.Method(typeof(SoloMode), nameof(SoloMode.PlayerCountThreshold));
                 return codes;
             }
         }
 
-        Log.Warn($"[{ModEntry.ModId}] Solo test row: player-count check not found; single-player rows stay disabled.");
+        Log.Warn($"[{ModEntry.ModId}] Solo mode [dev]: player-count check not found; solo mode cannot add your row.");
         return codes;
     }
 }
@@ -43,12 +47,15 @@ internal static class MultiplayerPlayerStateSoloTestRowNamePatch
     [HarmonyPostfix]
     private static void Postfix(MegaLabel ____nameplateLabel)
     {
-        if (RunManager.Instance.RunLobby is not null)
+        HookGuard.Run("Solo mode name", "the row keeps the game's name", () =>
         {
-            return;
-        }
+            if (!SoloMode.Enabled || RunManager.Instance.RunLobby is not null)
+            {
+                return;
+            }
 
-        var platform = PlatformUtil.PrimaryPlatform;
-        ____nameplateLabel.SetTextAutoSize(PlatformUtil.GetPlayerNameRaw(platform, PlatformUtil.GetLocalPlayerId(platform)));
+            var platform = PlatformUtil.PrimaryPlatform;
+            ____nameplateLabel.SetTextAutoSize(PlatformUtil.GetPlayerNameRaw(platform, PlatformUtil.GetLocalPlayerId(platform)));
+        });
     }
 }

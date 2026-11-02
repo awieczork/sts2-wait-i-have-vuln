@@ -11,6 +11,8 @@ During a co-op combat:
 - **Vulnerable icon.** The Vulnerable icon appears next to a player's name in the top-left player list while that player has a supported card in hand. Your own row is included.
 - **"Wait! I have vuln!" bubble.** When a player's icon turns on, for example after drawing Bash, a speech bubble with that text appears over their character for four seconds.
 
+To change what you see, set it before you start or continue a run: from the main menu, open Settings > Mod Settings and select **Wait! I Have Vuln!**. The game greys out Mod Settings during a run. You can turn the bubble off, hide the icon and the bubble on your own row, and set the icon size from 50% to 150%. Use the mouse, because the keyboard cannot reach or switch these settings. Your choices are kept in `%APPDATA%\SlayTheSpire2\WaitIHaveVuln\settings.json`.
+
 Supported cards: Assassinate, Bash, Beam Cell, Break, Comet, Dominate, Expose, Falling Star, Fear, Gamma Blast, High Five, Know Thy Place, Meteor Shower, Putrefy, Shockwave, Squash, Taunt, Thunderclap, Tremble, and Uppercut.
 
 ## Good to know
@@ -18,10 +20,10 @@ Supported cards: Assassinate, Bash, Beam Cell, Break, Comet, Dominate, Expose, F
 - **Only the players who want to see it need the mod.** The host does not. Each player sees the icons and bubbles on their own screen only.
 - **It cannot desync a run.** The mod only reads game state and never runs game commands. It is marked as not affecting gameplay, so the game lets you join a host whose mods differ and only notes it in the log.
 - **In hand means in hand.** The icon does not check whether the player has the energy or a target to play the card.
-- **Single-player looks the same as without the mod.**
+- **Single-player looks the same as without the mod,** unless you turn on **Solo mode [dev]** in the settings. It is a testing aid that shows your own row in single-player runs from the next run you start or continue, and it turns off when the game restarts.
 - **After a disconnect,** a player's icon keeps its last state until the mod can see their hand again.
 - **The bubble text is always English.**
-- **Not tested yet:** hosting with the mod, reconnecting in the middle of a combat, Linux, and Steam Deck.
+- **Not tested yet:** hosting with the mod, reconnecting in the middle of a combat, using the settings with a controller, Linux, and Steam Deck.
 - **Needs game version 0.107.1 or newer.**
 
 ## Install
@@ -46,7 +48,7 @@ To bring your normal progress into the modded profile, follow the [save guide](d
 3. Run `dotnet build WaitIHaveVuln.csproj`.
 4. Run `dotnet run --project tests/RegressionHarness/WaitIHaveVuln.RegressionHarness.csproj`.
 
-Deployment, the solo test build, and the release checklist are in [CONTRIBUTING.md](CONTRIBUTING.md).
+Deployment, testing alone with solo mode, and the release checklist are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What's changed
 

@@ -12,5 +12,8 @@
     <Compile Include="../../src/Indicator/VulnerableCardPredicate.cs" Link="VulnerableCardPredicate.cs" />
     <Compile Include="../../src/Indicator/ICardHand.cs" Link="ICardHand.cs" />
     <Compile Include="../../src/Indicator/HandIndicatorState.cs" Link="HandIndicatorState.cs" />
+    <Compile Include="../../src/Settings/PlayerSettings.cs" Link="PlayerSettings.cs" />
+    <Compile Include="../../src/Settings/SettingsLoadOutcome.cs" Link="SettingsLoadOutcome.cs" />
+    <Compile Include="../../src/Settings/SettingsStore.cs" Link="SettingsStore.cs" />
   </ItemGroup>
 </Project>

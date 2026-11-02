@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Godot;
+using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Logging;
@@ -8,6 +9,7 @@ using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
 using MegaCrit.Sts2.Core.Nodes.Vfx;
 using MegaCrit.Sts2.Core.Runs;
+using WaitIHaveVuln.Settings;
 
 namespace WaitIHaveVuln.Indicator;
 
@@ -60,31 +62,21 @@ internal static class MultiplayerPlayerStateIndicators
         });
     }
 
-    // The patches run inside the game's own UI callbacks. A failure here must never
-    // propagate into the game, so it is logged and the row simply keeps its current state.
     private static void Guard(string hook, Action action)
     {
-        try
-        {
-            action();
-        }
-        catch (Exception exception)
-        {
-            Log.Warn($"[{ModEntry.ModId}] {hook} failed; the indicator keeps its current state. {exception}");
-        }
+        HookGuard.Run(hook, "the indicator keeps its current state", action);
     }
 
     private static bool IsConnected(NMultiplayerPlayerState row)
     {
         var lobby = RunManager.Instance.RunLobby;
-#if SOLO_TEST_ROW
-        // Single-player runs have no lobby; the solo test row is always connected.
+        // Single-player runs have no lobby; only solo mode creates a row there, and it counts as connected.
         if (lobby is null)
         {
-            return true;
+            return SoloMode.Enabled;
         }
-#endif
-        return lobby is not null && lobby.ConnectedPlayerIds.Contains(row.Player.NetId);
+
+        return lobby.ConnectedPlayerIds.Contains(row.Player.NetId);
     }
 
     private sealed class CardPileHand : ICardHand<CardModel>
@@ -113,7 +105,7 @@ internal static class MultiplayerPlayerStateIndicators
 
     private sealed class RowIndicator : IDisposable
     {
-        private const float IconSize = 28f;
+        private const float IconSize = 36f;
         private const float Gap = 12f;
         private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
         private const string SpeechText = "Wait! I have vuln!";
@@ -136,7 +128,7 @@ internal static class MultiplayerPlayerStateIndicators
             // The visible bar, not the whole health bar node, which also holds the block badge.
             _hpBar = healthBar.HpBarContainer;
             _portrait = portrait;
-            _state = new HandIndicatorState<CardModel>(card => card.Id.Entry, SetVisible);
+            _state = new HandIndicatorState<CardModel>(card => card.Id.Entry, OnHandChanged);
         }
 
         internal void BeginCombat(bool disconnected)
@@ -181,44 +173,57 @@ internal static class MultiplayerPlayerStateIndicators
             FollowLayout(false);
         }
 
-        private void SetVisible(bool visible)
+        // The settings are read here and never change while rows exist, because the game
+        // greys out Mod Settings during a run.
+        private void OnHandChanged(bool hasCard)
+        {
+            var settings = SettingsService.Current;
+            var visible = settings.ShowsIndicator(hasCard, LocalContext.IsMe(_row.Player));
+            if (SetVisible(visible) && settings.ShowBubble)
+            {
+                ShowSpeechBubble();
+            }
+        }
+
+        // Returns true when the icon was just created.
+        private bool SetVisible(bool visible)
         {
             if (visible)
             {
                 if (_icon is not null)
                 {
-                    return;
+                    return false;
                 }
 
                 // The icon is the primary signal; without it the bubble would announce nothing.
                 var texture = LoadVulnerableTexture();
                 if (texture is null)
                 {
-                    return;
+                    return false;
                 }
 
                 // ExpandMode comes before any size: under the default KeepSize, Godot clamps Size up to
                 // the texture's own size, and switching to IgnoreSize afterwards does not shrink it back.
+                var size = IconSize * SettingsService.Current.IconScale;
                 var icon = new TextureRect
                 {
                     ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                     StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                     Texture = texture,
-                    CustomMinimumSize = new Vector2(IconSize, IconSize),
-                    Size = new Vector2(IconSize, IconSize),
+                    CustomMinimumSize = new Vector2(size, size),
+                    Size = new Vector2(size, size),
                     MouseFilter = Control.MouseFilterEnum.Ignore
                 };
                 _row.AddChild(icon);
                 _icon = icon;
                 UpdateIconPosition();
                 FollowLayout(true);
-                ShowSpeechBubble();
-                return;
+                return true;
             }
 
             if (_icon is null)
             {
-                return;
+                return false;
             }
 
             FollowLayout(false);
@@ -229,6 +234,7 @@ internal static class MultiplayerPlayerStateIndicators
             }
 
             _icon = null;
+            return false;
         }
 
         private void ShowSpeechBubble()

@@ -35,22 +35,6 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "build and deploy mod (solo test row)",
-            "type": "process",
-            "command": "dotnet",
-            "args": [
-                "build",
-                "${workspaceFolder}\\WaitIHaveVuln.csproj",
-                "--no-restore",
-                "-p:DeployMod=true",
-                "-p:SoloTestRow=true"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
             "label": "clean",
             "type": "process",
             "command": "dotnet",
