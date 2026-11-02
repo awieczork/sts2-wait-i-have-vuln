@@ -16,6 +16,16 @@ body:
       description: From Settings > Mod Settings, or the Workshop change notes.
     validations:
       required: true
+  - type: textarea
+    id: mod-settings
+    attributes:
+      label: Mod settings
+      description: From the main menu, Settings > Mod Settings > Wait! I Have Vuln!. With "Show icon on my own row" off, your own row shows nothing.
+      placeholder: |
+        Show speech bubble: on
+        Show icon on my own row: on
+        Icon size: 100%
+        Solo mode [dev]: off
   - type: dropdown
     id: role
     attributes:
