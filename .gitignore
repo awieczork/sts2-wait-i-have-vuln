@@ -440,3 +440,9 @@ decompiled/
 references/
 !/.github/skills/publish/
 !/.github/skills/publish/references/
+
+# Steam Workshop upload workspace: metadata is tracked, payload and preview are local
+workshop/content/
+workshop/previews/
+workshop/image.png
+workshop/mod-uploader.log
