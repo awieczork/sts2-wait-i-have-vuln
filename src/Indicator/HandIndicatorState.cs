@@ -1,47 +1,10 @@
-using System;
-using System.Collections.Generic;
-
 namespace WaitIHaveVuln.Indicator;
 
-internal static class VulnerableCardPredicate
-{
-    private static readonly HashSet<string> SupportedModelIds = new(StringComparer.Ordinal)
-    {
-        "ASSASSINATE",
-        "BASH",
-        "BEAM_CELL",
-        "BREAK",
-        "COMET",
-        "DOMINATE",
-        "EXPOSE",
-        "FALLING_STAR",
-        "FEAR",
-        "GAMMA_BLAST",
-        "HIGH_FIVE",
-        "KNOW_THY_PLACE",
-        "METEOR_SHOWER",
-        "PUTREFY",
-        "SHOCKWAVE",
-        "SQUASH",
-        "TAUNT",
-        "THUNDERCLAP",
-        "TREMBLE",
-        "UPPERCUT"
-    };
-
-    internal static IReadOnlySet<string> SupportedIds => SupportedModelIds;
-
-    internal static bool IsSupported(string modelId) => SupportedModelIds.Contains(modelId);
-}
-
-
-internal interface ICardHand<TCard>
-{
-    IReadOnlyList<TCard> Cards { get; }
-    event Action<TCard> CardAdded;
-    event Action<TCard> CardRemoved;
-}
-
+/// <summary>
+/// Engine-independent indicator state for one player's row: follows a bound hand and reports
+/// visibility changes only when the first qualifying card arrives or the last one leaves.
+/// Suspending keeps the last observed result until a hand is bound again.
+/// </summary>
 internal sealed class HandIndicatorState<TCard> : IDisposable
 {
     private readonly Func<TCard, string> _getModelId;

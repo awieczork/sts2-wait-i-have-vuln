@@ -7,7 +7,10 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
+  <!-- Links the engine-independent production sources; no game assemblies are needed. -->
   <ItemGroup>
-    <Compile Include="../../src/Indicator/VulnerableIndicatorState.cs" Link="VulnerableIndicatorState.cs" />
+    <Compile Include="../../src/Indicator/VulnerableCardPredicate.cs" Link="VulnerableCardPredicate.cs" />
+    <Compile Include="../../src/Indicator/ICardHand.cs" Link="ICardHand.cs" />
+    <Compile Include="../../src/Indicator/HandIndicatorState.cs" Link="HandIndicatorState.cs" />
   </ItemGroup>
 </Project>

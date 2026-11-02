@@ -4,17 +4,26 @@ namespace WaitIHaveVuln.RegressionHarness;
 
 internal static class Program
 {
+    private static readonly Action[] Cases =
+    {
+        VerifyExactSupportedSet,
+        VerifyHandTransitions,
+        VerifyRebindingAndCombatEnd,
+        VerifyInterruptedTracking,
+        VerifyOwnerCleanup,
+        VerifyLocalAndRemoteRows
+    };
+
     private static int _assertions;
 
     private static void Main()
     {
-        VerifyExactSupportedSet();
-        VerifyHandTransitions();
-        VerifyRebindingAndCombatEnd();
-        VerifyInterruptedTracking();
-        VerifyOwnerCleanup();
-        VerifyLocalAndRemoteRows();
-        Console.WriteLine($"PASS: 6 regression cases, {_assertions} assertions.");
+        foreach (var regressionCase in Cases)
+        {
+            regressionCase();
+        }
+
+        Console.WriteLine($"PASS: {Cases.Length} regression cases, {_assertions} assertions.");
     }
 
     private static void VerifyExactSupportedSet()

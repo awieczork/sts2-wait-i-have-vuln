@@ -16,15 +16,60 @@ internal static class MultiplayerPlayerStateIndicators
 
     internal static void OnCombatSetUp(NMultiplayerPlayerState row, HBoxContainer topContainer)
     {
-        var indicator = Indicators.GetValue(row, state => new RowIndicator(state, topContainer));
-        indicator.BeginCombat(!IsConnected(row));
+        Guard(nameof(OnCombatSetUp), () =>
+        {
+            var indicator = Indicators.GetValue(row, state => new RowIndicator(state, topContainer));
+            indicator.BeginCombat(!IsConnected(row));
+        });
     }
 
     internal static void OnConnectionStateChanged(NMultiplayerPlayerState row)
     {
-        if (Indicators.TryGetValue(row, out var indicator))
+        Guard(nameof(OnConnectionStateChanged), () =>
         {
-            indicator.UpdateConnectionState(!IsConnected(row));
+            if (Indicators.TryGetValue(row, out var indicator))
+            {
+                indicator.UpdateConnectionState(!IsConnected(row));
+            }
+        });
+    }
+
+    internal static void OnCombatEnded(NMultiplayerPlayerState row)
+    {
+        Guard(nameof(OnCombatEnded), () =>
+        {
+            if (Indicators.TryGetValue(row, out var indicator))
+            {
+                indicator.EndCombat();
+            }
+        });
+    }
+
+    internal static void OnExitTree(NMultiplayerPlayerState row)
+    {
+        Guard(nameof(OnExitTree), () =>
+        {
+            if (!Indicators.TryGetValue(row, out var indicator))
+            {
+                return;
+            }
+
+            indicator.Dispose();
+            Indicators.Remove(row);
+        });
+    }
+
+    // The patches run inside the game's own UI callbacks. A failure here must never
+    // propagate into the game, so it is logged and the row simply keeps its current state.
+    private static void Guard(string hook, Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception exception)
+        {
+            Log.Warn($"[{ModEntry.ModId}] {hook} failed; the indicator keeps its current state. {exception}");
         }
     }
 
@@ -39,25 +84,6 @@ internal static class MultiplayerPlayerStateIndicators
         }
 #endif
         return lobby is not null && lobby.ConnectedPlayerIds.Contains(row.Player.NetId);
-    }
-
-    internal static void OnCombatEnded(NMultiplayerPlayerState row)
-    {
-        if (Indicators.TryGetValue(row, out var indicator))
-        {
-            indicator.EndCombat();
-        }
-    }
-
-    internal static void OnExitTree(NMultiplayerPlayerState row)
-    {
-        if (!Indicators.TryGetValue(row, out var indicator))
-        {
-            return;
-        }
-
-        indicator.Dispose();
-        Indicators.Remove(row);
     }
 
     private sealed class CardPileHand : ICardHand<CardModel>
@@ -188,7 +214,7 @@ internal static class MultiplayerPlayerStateIndicators
                     return;
                 }
 
-                ShowSpeechBubble();
+                // The icon is the primary signal; without it the bubble would announce nothing.
                 var texture = LoadVulnerableTexture();
                 if (texture is null)
                 {
@@ -207,6 +233,7 @@ internal static class MultiplayerPlayerStateIndicators
                 _row.AddChild(icon);
                 _icon = icon;
                 UpdateIconPosition();
+                ShowSpeechBubble();
                 return;
             }
 
@@ -227,7 +254,7 @@ internal static class MultiplayerPlayerStateIndicators
         private void ShowSpeechBubble()
         {
             var creature = _row.Player.Creature;
-            if (creature.IsDead)
+            if (creature is null || creature.IsDead)
             {
                 return;
             }
@@ -259,6 +286,7 @@ internal static class MultiplayerPlayerStateIndicators
             icon.Position = new Vector2(topRight.X + Gap, topCenter.Y - IconSize * 0.5f);
         }
 
+        // Loaded once per process. A failure is logged once and leaves the icon off until restart.
         private static Texture2D? LoadVulnerableTexture()
         {
             if (_textureLoadAttempted)
