@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: How the mod works and how to install it
+    url: https://github.com/awieczork/sts2-wait-i-have-vuln#readme
+    about: The README covers what you see, who needs the mod, and known limitations.
+  - name: Steam Workshop page
+    url: https://steamcommunity.com/sharedfiles/filedetails/?id=3831970006
+    about: Subscribe, see pictures, and read the change notes.

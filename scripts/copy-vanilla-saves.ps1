@@ -53,8 +53,8 @@ Write-Host "From: $source"
 Write-Host "To:   $target"
 Write-Host ''
 Write-Host 'Steam Cloud for Slay the Spire 2 must be OFF (Steam > right-click the game > Properties > General).'
-Write-Host 'Otherwise the game replaces the copied files with the Steam Cloud copies on its next start.'
-Write-Host 'Progress, settings, and run history in the modded profile will be replaced.'
+Write-Host 'Otherwise the game may replace the copied files with the Steam Cloud copies on its next start.'
+Write-Host 'Progress and settings in the modded profile will be overwritten; extra run-history files there are kept.'
 if (-not $Yes) {
     $answer = Read-Host 'Type yes to continue'
     if ($answer -ne 'yes') {

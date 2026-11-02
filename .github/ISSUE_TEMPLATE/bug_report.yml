@@ -1,0 +1,53 @@
+name: Bug report
+description: Something looks wrong in game
+labels: [bug]
+body:
+  - type: input
+    id: game-version
+    attributes:
+      label: Game version and branch
+      description: Shown in the game's main menu, for example "v0.107.1 public" or "v0.111.0 beta".
+    validations:
+      required: true
+  - type: input
+    id: mod-version
+    attributes:
+      label: Mod version
+      description: From Settings > Mod Settings, or the Workshop change notes.
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: How were you playing?
+      options:
+        - Joined a co-op host
+        - Hosted a co-op game
+        - Single-player
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start a co-op combat as the joining player.
+        2. Draw Bash.
+        3. ...
+  - type: textarea
+    id: log
+    attributes:
+      label: Log lines
+      description: |
+        Paste the lines containing `[WaitIHaveVuln]` and any errors around the time it happened, from `godot.log`:
+        - Windows: `%APPDATA%\SlayTheSpire2\logs\godot.log`
+        - Linux: `~/.local/share/SlayTheSpire2/logs/godot.log`
+        - macOS: `~/Library/Application Support/SlayTheSpire2/logs/godot.log`
+      render: text

@@ -29,11 +29,15 @@ saves_root=""
 steam_id=""
 assume_yes=0
 
+need_value() {
+    [ $# -ge 2 ] || die "Option $1 needs a value."
+}
+
 while [ $# -gt 0 ]; do
     case "$1" in
-        -p|--profile) profile="${2:?}"; shift 2 ;;
-        -r|--saves-root) saves_root="${2:?}"; shift 2 ;;
-        -s|--steam-id) steam_id="${2:?}"; shift 2 ;;
+        -p|--profile) need_value "$@"; profile="$2"; shift 2 ;;
+        -r|--saves-root) need_value "$@"; saves_root="$2"; shift 2 ;;
+        -s|--steam-id) need_value "$@"; steam_id="$2"; shift 2 ;;
         -y|--yes) assume_yes=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) usage >&2; die "Unknown option: $1" ;;
@@ -92,8 +96,8 @@ echo "From: $source_dir"
 echo "To:   $target_dir"
 echo
 echo "Steam Cloud for Slay the Spire 2 must be OFF (Steam > right-click the game > Properties > General)."
-echo "Otherwise the game replaces the copied files with the Steam Cloud copies on its next start."
-echo "Progress, settings, and run history in the modded profile will be replaced."
+echo "Otherwise the game may replace the copied files with the Steam Cloud copies on its next start."
+echo "Progress and settings in the modded profile will be overwritten; extra run-history files there are kept."
 if [ "$assume_yes" -ne 1 ]; then
     read -r -p "Type yes to continue: " answer
     if [ "$answer" != "yes" ]; then
