@@ -427,22 +427,20 @@ FodyWeavers.xsd
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
 
-#
-.github/context
-
 # Local game path configuration and Godot-generated files
 Directory.Build.props
 .godot/
 **/.godot/
 
 # Optional decompiled game references
-decompiled/
-references/
-!/.github/skills/publish/
-!/.github/skills/publish/references/
+/decompiled/
+/references/
 
 # Steam Workshop upload workspace: metadata is tracked, payload and preview are local
 workshop/content/
 workshop/previews/
 workshop/image.png
 workshop/mod-uploader.log
+
+# Local tools, such as Mega Crit's mod uploader
+/tools/
