@@ -1,141 +1,89 @@
 # Contributing
 
-This guide prepares a Windows x64 development machine for this repository and records its local build, test, and optional deployment procedures.
-Run PowerShell commands from the repository root unless noted otherwise.
+This guide covers setting up a Windows machine, building, testing, deploying to a local game install, and releasing.
+Run the commands from the repository root.
 
-## Prepare a machine
+## Set up
 
-1. Clone the repository with `git clone https://github.com/awieczork/sts2-wait-i-have-vuln.git` and open the repository root in your editor.
-2. Install the .NET 9 SDK; the .NET runtime alone cannot build the project.
-3. Install Slay the Spire 2 locally and locate its managed assemblies under `data_sts2_windows_x86_64`.
-4. Inspect `Directory.Build.props.example` and create the ignored local `Directory.Build.props` only when it does not already exist:
+1. Clone the repository and install the .NET 9 SDK; the .NET runtime alone cannot build the project.
+2. Install Slay the Spire 2 through Steam. The build finds the game on its own through the Steam registry entries or the default Steam library (see `Sts2PathDiscovery.props`).
+3. If the build reports that `sts2.dll` was not found, copy `Directory.Build.props.example` to `Directory.Build.props` (ignored by Git) and set `Sts2InstallDir` to your game folder, or pass `-p:Sts2InstallDir="<game folder>"` on the command line.
 
-   ```powershell
-   if (-not (Test-Path -LiteralPath .\Directory.Build.props)) {
-       Copy-Item -LiteralPath .\Directory.Build.props.example -Destination .\Directory.Build.props
-   }
-   ```
+No Godot editor is needed; the mod ships a DLL only.
+The workspace recommends the C# extension for VS Code, but any editor works.
 
-5. Edit `Sts2InstallDir` in the local props file to the game install directory on this machine.
-6. Keep the template's derived paths aligned with the local install: `Sts2DataDir` points to `$(Sts2InstallDir)\data_sts2_windows_x86_64`, and `Sts2ModsDir` points to `$(Sts2InstallDir)\mods\$(MSBuildProjectName)`.
+## Layout
 
-Do not overwrite an existing `Directory.Build.props` while preparing another machine; inspect and update only the local values that need changing.
-The tracked example is a template, not a universal game install path.
-Keep machine-specific paths in the ignored local file rather than tracked configuration.
+| Path | What's in it |
+| --- | --- |
+| `WaitIHaveVuln.csproj`, `WaitIHaveVuln.sln` | Project and solution; the solution also includes the harness. |
+| `WaitIHaveVuln.json` | Mod manifest. `id` is `WaitIHaveVuln`; the display name is `Wait! I Have Vuln!`. |
+| `Sts2PathDiscovery.props`, `Directory.Build.props.example` | Game path discovery and the optional local override template. |
+| `src/ModEntry.cs` | Initializer; installs the Harmony patches and owns the `ModId` constant. |
+| `src/Patches/` | Thin Harmony postfixes on the co-op player row lifecycle. |
+| `src/Indicator/` | Row UI (`MultiplayerVulnerableIndicator.cs`) and engine-independent logic (`VulnerableCardPredicate.cs`, `ICardHand.cs`, `HandIndicatorState.cs`). |
+| `src/Testing/` | Solo test row patches, compiled only with `-p:SoloTestRow=true`. |
+| `tests/RegressionHarness/` | Console harness that links the engine-independent sources and drives them with a fake hand. |
+| `scripts/` | Player helpers that copy normal saves into the modded profile; described in `docs/modded-saves.md`. Not part of the mod. |
+| `docs/` | Player guides linked from the README. |
 
-The current project targets `net9.0` and uses `Godot.NET.Sdk` version `4.5.1`.
-The local SDK version previously verified for this workspace was `9.0.319`; the repository does not pin an SDK patch version.
-No Godot editor or GDScript tooling is required for this C# build.
-The workspace recommends Microsoft's C# extension, but no editor extension is required to run the build.
+The project references `sts2.dll`, `GodotSharp.dll`, and `0Harmony.dll` from the game install as non-copy-local references.
+The manifest declares no dependencies; BaseLib is not required.
 
-## Project layout and identity
-
-- `WaitIHaveVuln.csproj` and `WaitIHaveVuln.sln` are the root project and solution.
-- `WaitIHaveVuln.json` is the single mod manifest; its `id` is `WaitIHaveVuln` and its display `name` is `wait-i-have-vuln`.
-- `src/ModEntry.cs` owns the initializer and the single internal `ModId` identity constant.
-- `src/Patches/MultiplayerPlayerStatePatches.cs` contains the thin multiplayer row lifecycle patches.
-- `src/Indicator/MultiplayerVulnerableIndicator.cs` owns row-level UI and lifecycle integration.
-- `src/Indicator/VulnerableIndicatorState.cs` contains the engine-independent eligibility predicate and hand state.
-- `tests/RegressionHarness/WaitIHaveVuln.RegressionHarness.csproj` links the production state source into the fake-hand regression harness.
-- `scripts/copy-vanilla-saves.ps1` and `scripts/copy-vanilla-saves.sh` are player-facing helpers that back up the account save folder and copy a normal profile's progress into the matching modded profile; the README describes their use. They are not part of the mod payload. They were checked against a fake save tree under PowerShell 7, Windows PowerShell 5.1, and Git Bash, not against real game saves.
-
-The project references the installed game assemblies `sts2.dll`, `GodotSharp.dll`, and `0Harmony.dll` from `Sts2DataDir`.
-Those references are non-copy-local and are not deployment dependencies.
-The manifest declares no dependencies; this project does not require BaseLib.
-The manifest currently declares version `0.1.0` and minimum game version `0.107.1`; neither value establishes compatibility with newer game versions.
-
-## Restore, build, and test
-
-On a fresh machine or after a dependency change, restore the main project separately:
+## Build and test
 
 ```powershell
-dotnet restore .\WaitIHaveVuln.csproj
+dotnet build .\WaitIHaveVuln.csproj
+dotnet run --project .\tests\RegressionHarness\WaitIHaveVuln.RegressionHarness.csproj
 ```
 
-This restore may download the Godot .NET SDK or other required packages.
-An agent must obtain approval before running a restore that may download packages.
+The first build restores the Godot .NET SDK package.
+The regular build does not deploy; `DeployMod` defaults to `false`.
+The VS Code task `build (safe)` runs the same build.
 
-After restore, the regular build does not restore packages and does not deploy to the game directory; `DeployMod` defaults to `false`:
+The harness covers the supported card set, hand transitions, rebinding, suspended tracking, owner cleanup, and independent local and remote rows.
+It does not load the game, so it cannot verify resource loading, layout, or multiplayer behaviour.
+
+## Deploy to your game
 
 ```powershell
-dotnet build .\WaitIHaveVuln.csproj --no-restore
+dotnet build .\WaitIHaveVuln.csproj -p:DeployMod=true
 ```
 
-The VS Code task `build (safe)` runs this build.
+This copies `WaitIHaveVuln.dll` and `WaitIHaveVuln.json` to `<game>\mods\WaitIHaveVuln` and refuses any other destination.
+The VS Code task `build and deploy mod` runs the same build.
+Close the game first; it locks the DLL.
 
-On a fresh machine, restore the harness project separately as well:
-
-```powershell
-dotnet restore .\tests\RegressionHarness\WaitIHaveVuln.RegressionHarness.csproj
-```
-
-Then run its checks without another restore:
-
-```powershell
-dotnet run --project .\tests\RegressionHarness\WaitIHaveVuln.RegressionHarness.csproj --no-restore
-```
-
-The harness links the production eligibility predicate and hand-state implementation and uses a fake hand without executing game code.
-It covers the supported-model boundary, hand transitions, rebinding, interrupted tracking, owner cleanup, and independent local/remote row state.
-It does not verify game loading, resource loading, rendered row fit, multiplayer host/join behavior, or reconnect freshness.
-
-## Local configuration and generated files
-
-Git transfers tracked source, project and manifest files, tests, documentation, the props example, and the workspace's VS Code settings, tasks, and extension recommendations.
-It does not transfer the ignored machine-local `Directory.Build.props`, generated `.godot/mono/temp`, `bin`, or `obj` outputs, or ignored `.github/context/` task history.
-The workspace extension recommendation does not install an extension; VS Code extensions and personal Copilot plugins belong to a user profile, not this repository.
-
-Do not put secrets, access tokens, Steam account information, game binaries or assets, decompiled game content, or save files in tracked documentation or configuration.
-The repository is public, so everything committed to it is visible to everyone.
-
-## Optional deployment and load check
-
-Deployment is explicit and is not part of the regular build.
-Only run the command below when deployment to this machine's game install is intended and approved:
-
-```powershell
-dotnet build .\WaitIHaveVuln.csproj --no-restore -p:DeployMod=true
-```
-
-The VS Code task `build and deploy mod` runs the same opt-in operation.
-The project verifies that `Sts2ModsDir` is exactly `mods\WaitIHaveVuln` beneath `Sts2InstallDir`.
-It copies only `WaitIHaveVuln.dll` and `WaitIHaveVuln.json` to that folder; game assemblies and Godot bindings are not copied.
+Then start the game, accept the mods warning on the first modded launch, enable the mod under Settings > Mod Settings, and look for `[WaitIHaveVuln] Mod initialized.` in `%APPDATA%\SlayTheSpire2\logs\godot.log`.
+That line confirms the patches were installed, not that the icon rendered.
 
 ### Solo test row
 
-For local testing without a co-op session, build with the opt-in `SoloTestRow` property, which defaults to `false`:
-
 ```powershell
-dotnet build .\WaitIHaveVuln.csproj --no-restore -p:DeployMod=true -p:SoloTestRow=true
+dotnet build .\WaitIHaveVuln.csproj -p:DeployMod=true -p:SoloTestRow=true
 ```
 
-The VS Code task `build and deploy mod (solo test row)` runs the same operation.
-This defines `SOLO_TEST_ROW`, which lets the game create the local player's co-op row in single-player runs and treats a missing lobby as connected, so the indicator can be checked on that row.
-Without a lobby, the test row's nameplate shows the local platform player name instead of the net id.
-The log then also contains `[WaitIHaveVuln] Solo test row enabled (test build).`.
-A test build changes single-player presentation and must not be distributed; rebuild and redeploy without the property to restore the regular build.
-It does not exercise remote hands, host/join, or reconnect behavior.
+This compiles `src/Testing/` in and defines `SOLO_TEST_ROW`: the game creates the local player's co-op row in single-player runs and treats a missing lobby as connected, so you can check the icon and the bubble alone.
+The VS Code task `build and deploy mod (solo test row)` runs the same build, and the log then also says `Solo test row enabled (test build)`.
+A test build changes single-player presentation and must never be distributed; rebuild without the property afterwards.
+It does not exercise remote hands, hosting, or reconnects.
 
-The internal identity change does not remove an older `CoopVulnIndicator` installation.
-Do not enable both identities at once, and do not delete or modify game files based on this guide.
+A successful compile and harness run are not runtime verification; co-op behaviour needs a real session.
 
-On the first modded launch, acknowledge the game's mods warning; the game skips loading mods until that warning has been seen.
-After an explicit deployment, enable the mod in Settings > Mod Settings and restart the game if prompted.
-Check `%APPDATA%\SlayTheSpire2\logs\godot.log` for `[WaitIHaveVuln] Mod initialized.`.
-That message confirms the initializer installed the Harmony patches; it does not verify that the icon loaded or rendered correctly.
+## Submit a change
 
-The solo test row has been checked in-game for icon loading, row fit, Bash draw/play transitions, and the speech bubble.
-Joining an unmodded co-op host succeeds with a logged non-gameplay mod mismatch warning; hosting with the mod and reconnects have not been checked.
-Compile and harness success are not substitutes for runtime, resource, layout, host/join, or reconnect checks.
+- Open an issue first for anything that changes what players see. The mod stays quality-of-life only, and `affects_gameplay: false` in the manifest must stay true to its behaviour.
+- Branch from `main`, write commits in Conventional Commits form (`feat:`, `fix:`, `docs:`, `chore:`), and open a pull request against `main`.
+- Build and run the harness before pushing.
+- Add one bullet under `## Unreleased` in `CHANGELOG.md` for each player-visible result; tooling changes get no bullet.
+- Never commit `Directory.Build.props`, game files, decompiled code, save files, or credentials. The repository is public.
 
-## Clean and release procedures
+## Release (maintainer)
 
-Run the VS Code task `clean` or this command to remove workspace build outputs:
+1. Move the `Unreleased` notes to `## [x.y.z] - YYYY-MM-DD`, set the same `version` in `WaitIHaveVuln.json`, and commit as `chore(release): prepare vx.y.z`.
+2. Build the release DLL with `dotnet build .\WaitIHaveVuln.csproj --configuration ExportRelease --no-incremental`; the output is `.godot\mono\temp\bin\ExportRelease\WaitIHaveVuln.dll`.
+3. Zip `WaitIHaveVuln.dll` and `WaitIHaveVuln.json` as `wait-i-have-vuln-vx.y.z.zip` and test that exact build in the game.
+4. Tag `vx.y.z`, push, and create the GitHub release with the ZIP and the changelog section as notes.
+5. Upload the same two files to Steam Workshop with Mega Crit's [mod uploader](https://github.com/megacrit/sts2-mod-uploader), using the same notes as the change note and a preview image under 1 MB.
 
-```powershell
-dotnet clean .\WaitIHaveVuln.csproj
-```
-
-Clean does not remove deployed mod files.
-Use the [commit workflow](.github/skills/commit/SKILL.md) for reviewed local commits and the [publish workflow](.github/skills/publish/SKILL.md) for tagged releases.
-Player-facing changes belong in [CHANGELOG.md](CHANGELOG.md).
+`dotnet clean .\WaitIHaveVuln.csproj` removes build outputs; it does not remove deployed files.
