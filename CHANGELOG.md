@@ -5,10 +5,17 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## Unreleased
 
+## [0.1.1] - 2026-11-02
+
 ### Changed
 
 - The game mod list shows the mod as Wait! I Have Vuln! by Limonene.
 - The mod description in the game mod list states that the mod is client-side and does not affect gameplay.
+
+### Fixed
+
+- The co-op player list keeps working when the mod hits an error; the affected icon keeps its last state and the error goes to the game log as a warning.
+- The "Wait! I have vuln!" bubble appears only when the Vulnerable icon appears next to the player.
 
 ## [0.1.0] - 2026-11-01
 
@@ -19,4 +26,5 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 - A "Wait! I have vuln!" speech bubble appears over a player's character for four seconds when their Vulnerable icon turns on.
 - The game mod list identifies the mod as `wait-i-have-vuln`.
 
+[0.1.1]: https://github.com/awieczork/sts2-wait-i-have-vuln/releases/tag/v0.1.1
 [0.1.0]: https://github.com/awieczork/sts2-wait-i-have-vuln/releases/tag/v0.1.0
