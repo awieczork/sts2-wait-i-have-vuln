@@ -4,6 +4,7 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
 using MegaCrit.Sts2.Core.Nodes.Vfx;
 using MegaCrit.Sts2.Core.Runs;
@@ -14,11 +15,11 @@ internal static class MultiplayerPlayerStateIndicators
 {
     private static readonly ConditionalWeakTable<NMultiplayerPlayerState, RowIndicator> Indicators = new();
 
-    internal static void OnCombatSetUp(NMultiplayerPlayerState row, HBoxContainer topContainer)
+    internal static void OnCombatSetUp(NMultiplayerPlayerState row, HBoxContainer topContainer, NHealthBar healthBar, TextureRect portrait)
     {
         Guard(nameof(OnCombatSetUp), () =>
         {
-            var indicator = Indicators.GetValue(row, state => new RowIndicator(state, topContainer));
+            var indicator = Indicators.GetValue(row, state => new RowIndicator(state, topContainer, healthBar, portrait));
             indicator.BeginCombat(!IsConnected(row));
         });
     }
@@ -112,8 +113,8 @@ internal static class MultiplayerPlayerStateIndicators
 
     private sealed class RowIndicator : IDisposable
     {
-        private const float IconSize = 16f;
-        private const float Gap = 6f;
+        private const float IconSize = 28f;
+        private const float Gap = 12f;
         private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
         private const string SpeechText = "Wait! I have vuln!";
         private const double SpeechSeconds = 4.0;
@@ -121,33 +122,21 @@ internal static class MultiplayerPlayerStateIndicators
         private static Texture2D? _vulnerableTexture;
         private readonly NMultiplayerPlayerState _row;
         private readonly HBoxContainer _topContainer;
-        private readonly Viewport _viewport;
-        private readonly List<CanvasItem> _layoutItems = new();
+        private readonly Control? _hpBar;
+        private readonly Control _portrait;
         private readonly HandIndicatorState<CardModel> _state;
         private TextureRect? _icon;
+        private SceneTree? _frameTree;
         private bool _combatActive;
 
-        internal RowIndicator(NMultiplayerPlayerState row, HBoxContainer topContainer)
+        internal RowIndicator(NMultiplayerPlayerState row, HBoxContainer topContainer, NHealthBar healthBar, TextureRect portrait)
         {
             _row = row;
             _topContainer = topContainer;
-            _viewport = row.GetViewport();
+            // The visible bar, not the whole health bar node, which also holds the block badge.
+            _hpBar = healthBar.HpBarContainer;
+            _portrait = portrait;
             _state = new HandIndicatorState<CardModel>(card => card.Id.Entry, SetVisible);
-            for (Node? ancestor = _topContainer; ancestor is not null; ancestor = ancestor.GetParent())
-            {
-                if (ancestor is CanvasItem canvasItem)
-                {
-                    canvasItem.ItemRectChanged += UpdateIconPosition;
-                    _layoutItems.Add(canvasItem);
-                }
-
-                if (ReferenceEquals(ancestor, _row))
-                {
-                    break;
-                }
-            }
-
-            _viewport.SizeChanged += UpdateIconPosition;
         }
 
         internal void BeginCombat(bool disconnected)
@@ -189,20 +178,7 @@ internal static class MultiplayerPlayerStateIndicators
         {
             _combatActive = false;
             _state.Dispose();
-            foreach (var layoutItem in _layoutItems)
-            {
-                if (GodotObject.IsInstanceValid(layoutItem))
-                {
-                    layoutItem.ItemRectChanged -= UpdateIconPosition;
-                }
-            }
-
-            _layoutItems.Clear();
-
-            if (GodotObject.IsInstanceValid(_viewport))
-            {
-                _viewport.SizeChanged -= UpdateIconPosition;
-            }
+            FollowLayout(false);
         }
 
         private void SetVisible(bool visible)
@@ -221,18 +197,21 @@ internal static class MultiplayerPlayerStateIndicators
                     return;
                 }
 
+                // ExpandMode comes before any size: under the default KeepSize, Godot clamps Size up to
+                // the texture's own size, and switching to IgnoreSize afterwards does not shrink it back.
                 var icon = new TextureRect
                 {
+                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                     Texture = texture,
                     CustomMinimumSize = new Vector2(IconSize, IconSize),
                     Size = new Vector2(IconSize, IconSize),
-                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                     MouseFilter = Control.MouseFilterEnum.Ignore
                 };
                 _row.AddChild(icon);
                 _icon = icon;
                 UpdateIconPosition();
+                FollowLayout(true);
                 ShowSpeechBubble();
                 return;
             }
@@ -242,6 +221,7 @@ internal static class MultiplayerPlayerStateIndicators
                 return;
             }
 
+            FollowLayout(false);
             if (GodotObject.IsInstanceValid(_icon))
             {
                 _icon.Visible = false;
@@ -268,6 +248,43 @@ internal static class MultiplayerPlayerStateIndicators
             creature.GetVfxContainer()?.AddChildSafely(bubble);
         }
 
+        // Powers tween in and the name label resizes its font without a layout signal on the row,
+        // so placement is refreshed every frame while the icon shows.
+        private void FollowLayout(bool follow)
+        {
+            if (follow)
+            {
+                if (_frameTree is null && _row.GetTree() is { } tree)
+                {
+                    tree.ProcessFrame += OnProcessFrame;
+                    _frameTree = tree;
+                }
+
+                return;
+            }
+
+            if (_frameTree is not null && GodotObject.IsInstanceValid(_frameTree))
+            {
+                _frameTree.ProcessFrame -= OnProcessFrame;
+            }
+
+            _frameTree = null;
+        }
+
+        // A failure stops the per-frame updates, so it is logged once instead of every frame.
+        private void OnProcessFrame()
+        {
+            try
+            {
+                UpdateIconPosition();
+            }
+            catch (Exception exception)
+            {
+                FollowLayout(false);
+                Log.Warn($"[{ModEntry.ModId}] Icon placement failed; the icon keeps its last position. {exception}");
+            }
+        }
+
         private void UpdateIconPosition()
         {
             var icon = _icon;
@@ -279,11 +296,89 @@ internal static class MultiplayerPlayerStateIndicators
                 return;
             }
 
+            // Right after the drawn content of the name line and the health bar,
+            // centred on the whole row: portrait, name line, and health bar.
             var topRect = _topContainer.GetGlobalRect();
+            var right = ContentRight(_topContainer) ?? topRect.End.X;
+            var top = topRect.Position.Y;
+            var bottom = topRect.End.Y;
+            foreach (var part in new[] { _hpBar, _portrait })
+            {
+                if (part is null || !GodotObject.IsInstanceValid(part) || !part.IsVisibleInTree())
+                {
+                    continue;
+                }
+
+                var rect = part.GetGlobalRect();
+                top = Mathf.Min(top, rect.Position.Y);
+                bottom = Mathf.Max(bottom, rect.End.Y);
+                if (ReferenceEquals(part, _hpBar))
+                {
+                    right = Mathf.Max(right, rect.End.X);
+                }
+            }
+
             var rowTransform = _row.GetGlobalTransform().AffineInverse();
-            var topRight = rowTransform * topRect.End;
-            var topCenter = rowTransform * (topRect.Position + topRect.Size * 0.5f);
-            icon.Position = new Vector2(topRight.X + Gap, topCenter.Y - IconSize * 0.5f);
+            var topRight = rowTransform * new Vector2(right, top);
+            var bottomLocal = (rowTransform * new Vector2(right, bottom)).Y;
+            icon.Position = new Vector2(topRight.X + Gap, (topRight.Y + bottomLocal - icon.Size.Y) * 0.5f);
+        }
+
+        // Global X of the rightmost drawn content under a control. The name label and the power
+        // container keep fixed widths, so their rects reach past the text and the power icons.
+        private static float? ContentRight(Control control)
+        {
+            if (!control.Visible)
+            {
+                return null;
+            }
+
+            if (control is Label label)
+            {
+                return LabelTextRight(label);
+            }
+
+            float? right = null;
+            var hasChildControls = false;
+            foreach (var child in control.GetChildren())
+            {
+                if (child is not Control childControl)
+                {
+                    continue;
+                }
+
+                hasChildControls = true;
+                if (ContentRight(childControl) is { } childRight)
+                {
+                    right = right is { } current ? Mathf.Max(current, childRight) : childRight;
+                }
+            }
+
+            if (hasChildControls)
+            {
+                return right;
+            }
+
+            var rect = control.GetGlobalRect();
+            return rect.Size.X > 0f ? rect.End.X : null;
+        }
+
+        private static float? LabelTextRight(Label label)
+        {
+            if (string.IsNullOrEmpty(label.Text))
+            {
+                return null;
+            }
+
+            var rect = label.GetGlobalRect();
+            if (label.HorizontalAlignment != HorizontalAlignment.Left)
+            {
+                return rect.End.X;
+            }
+
+            var font = label.GetThemeFont("font");
+            var width = font.GetStringSize(label.Text, HorizontalAlignment.Left, -1f, label.GetThemeFontSize("font_size")).X;
+            return Mathf.Min(rect.End.X, (label.GetGlobalTransform() * new Vector2(width, 0f)).X);
         }
 
         // Loaded once per process. A failure is logged once and leaves the icon off until restart.

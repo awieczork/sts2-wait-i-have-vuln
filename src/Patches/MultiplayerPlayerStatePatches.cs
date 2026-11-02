@@ -1,5 +1,6 @@
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
 using WaitIHaveVuln.Indicator;
 
@@ -13,9 +14,11 @@ internal static class MultiplayerPlayerStateCombatSetUpPatch
     [HarmonyPostfix]
     private static void Postfix(
         NMultiplayerPlayerState __instance,
-        HBoxContainer ____topContainer)
+        HBoxContainer ____topContainer,
+        NHealthBar ____healthBar,
+        TextureRect ____characterIcon)
     {
-        MultiplayerPlayerStateIndicators.OnCombatSetUp(__instance, ____topContainer);
+        MultiplayerPlayerStateIndicators.OnCombatSetUp(__instance, ____topContainer, ____healthBar, ____characterIcon);
     }
 }
 

@@ -5,6 +5,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## Unreleased
 
+### Fixed
+
+- The Vulnerable icon on the co-op player list appears at a size that fits the row, sits right after the player's name, powers, or health bar, and is centred on the whole row.
+
 ## [0.1.1] - 2026-11-02
 
 ### Changed
