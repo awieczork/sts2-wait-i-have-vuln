@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## Unreleased
 
+## [0.1.2] - 2026-11-02
+
 ### Fixed
 
 - The Vulnerable icon on the co-op player list appears at a size that fits the row, sits right after the player's name, powers, or health bar, and is centred on the whole row.
@@ -30,5 +32,6 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 - A "Wait! I have vuln!" speech bubble appears over a player's character for four seconds when their Vulnerable icon turns on.
 - The game mod list identifies the mod as `wait-i-have-vuln`.
 
+[0.1.2]: https://github.com/awieczork/sts2-wait-i-have-vuln/releases/tag/v0.1.2
 [0.1.1]: https://github.com/awieczork/sts2-wait-i-have-vuln/releases/tag/v0.1.1
 [0.1.0]: https://github.com/awieczork/sts2-wait-i-have-vuln/releases/tag/v0.1.0
