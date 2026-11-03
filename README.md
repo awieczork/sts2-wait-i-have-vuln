@@ -9,9 +9,11 @@ A Slay the Spire 2 co-op mod that shows which players are holding a card that ap
 During a co-op combat:
 
 - **Vulnerable icon.** The Vulnerable icon appears next to a player's name in the top-left player list while that player has a supported card in hand. Your own row is included.
-- **"Wait! I have vuln!" bubble.** When a player's icon turns on, for example after drawing Bash, a speech bubble with that text appears over their character for four seconds.
+- **"Wait! I have vuln!" bubble.** When a player's icon turns on, for example after drawing Bash, a speech bubble appears over their character for four seconds, in their character's colour, while an enemy still lacks Vulnerable and the player has not ended their turn. The first bubble of each combat says "Wait! I have vuln!"; later ones vary, and some name you.
+- **Card reminder.** When you hover an Attack that does not apply Vulnerable itself while a teammate holds a supported card they can play right now, a thought cloud with the Vulnerable icon appears beside the card, clear of the card and its tips.
+- **Teammates' reactions.** When someone plays an Attack anyway, each teammate still holding a supported card reacts with a line over their character, angrier with each such Attack in the turn.
 
-To change what you see, set it before you start or continue a run: from the main menu, open Settings > Mod Settings and select **Wait! I Have Vuln!**. The game greys out Mod Settings during a run. You can turn the bubble off, hide the icon and the bubble on your own row, and set the icon size from 50% to 150%. Use the mouse, because the keyboard cannot reach or switch these settings. Your choices are kept in `%APPDATA%\SlayTheSpire2\WaitIHaveVuln\settings.json`.
+To change what you see, set it before you start or continue a run: from the main menu, open Settings > Mod Settings and select **Wait! I Have Vuln!**. The game greys out Mod Settings during a run. You can turn off every bubble and keep only the icon, turn off the card reminder, keep every bubble on one fixed line, hide everything on your own row, and set the icon size from 50% to 150%. Use the mouse, because the keyboard cannot reach or switch these settings. Your choices are kept in `%APPDATA%\SlayTheSpire2\WaitIHaveVuln\settings.json`.
 
 Supported cards: Assassinate, Bash, Beam Cell, Break, Comet, Dominate, Expose, Falling Star, Fear, Gamma Blast, High Five, Know Thy Place, Meteor Shower, Putrefy, Shockwave, Squash, Taunt, Thunderclap, Tremble, and Uppercut.
 
@@ -19,11 +21,11 @@ Supported cards: Assassinate, Bash, Beam Cell, Break, Comet, Dominate, Expose, F
 
 - **Only the players who want to see it need the mod.** The host does not. Each player sees the icons and bubbles on their own screen only.
 - **It cannot desync a run.** The mod only reads game state and never runs game commands. It is marked as not affecting gameplay, so the game lets you join a host whose mods differ and only notes it in the log.
-- **In hand means in hand.** The icon does not check whether the player has the energy or a target to play the card.
+- **In hand means in hand for the icon.** The icon does not check whether the player can play the card. The card reminder and the reactions skip a teammate who cannot play it right now, for example without the energy, and cannot know about energy gained later in the turn.
 - **Single-player looks the same as without the mod,** unless you turn on **Solo mode [dev]** in the settings. It is a testing aid that shows your own row in single-player runs from the next run you start or continue, and it turns off when the game restarts.
 - **After a disconnect,** a player's icon keeps its last state until the mod can see their hand again.
 - **The bubble text is always English.**
-- **Not tested yet:** hosting with the mod, reconnecting in the middle of a combat, using the settings with a controller, Linux, and Steam Deck.
+- **Not tested yet:** the card reminder and the reactions with real teammates (tested in solo mode only), hosting with the mod, reconnecting in the middle of a combat, using the settings with a controller, macOS, Linux, and Steam Deck.
 - **Needs game version 0.107.1 or newer.**
 
 ## Install

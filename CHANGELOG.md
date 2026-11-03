@@ -5,6 +5,19 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## Unreleased
 
+### Added
+
+- The card reminder shows a thought cloud with the Vulnerable icon beside the Attack you hover while a teammate holds a supported card they can play right now, and it skips cards that apply Vulnerable themselves.
+- A teammate holding a supported card reacts with a line over their character when another player plays an Attack before Vulnerable is applied, angrier with each such Attack in the turn.
+- The bubble over a player who draws a supported card varies its line, some lines with a player's name, and opens each combat with "Wait! I have vuln!".
+- The Card reminder setting turns the cloud off, and the Varied bubble lines setting keeps every bubble on one fixed line.
+
+### Changed
+
+- The bubble over a player who draws a supported card appears in their character's colour, and only while an enemy lacks Vulnerable and the player has not ended their turn.
+- The settings are grouped under Player list, Bubbles, and Developer, and the Show bubbles setting turns off every bubble and keeps only the icon.
+- A new line replaces a player's bubble still on screen instead of stacking over it.
+
 ## [0.2.0] - 2026-11-02
 
 ### Added
