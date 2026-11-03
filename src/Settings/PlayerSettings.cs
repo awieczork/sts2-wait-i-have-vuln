@@ -8,7 +8,7 @@ namespace WaitIHaveVuln.Settings;
 /// what they see. Values from a file are read leniently: a missing or wrong-typed field takes its
 /// default, the icon scale is clamped and snapped to its step, and unknown fields are ignored.
 /// </summary>
-internal sealed record PlayerSettings(int IconScalePercent, bool ShowBubble, bool ShowOnOwnRow)
+internal sealed record PlayerSettings(int IconScalePercent, bool ShowBubble, bool ShowOnOwnRow, bool ShowHandReminder, bool VariedBubbleLines)
 {
     internal const int MinScalePercent = 50;
     // 150% of the 36-unit icon is about the largest size checked clear of the relic bar above the row.
@@ -16,9 +16,13 @@ internal sealed record PlayerSettings(int IconScalePercent, bool ShowBubble, boo
     internal const int ScaleStepPercent = 10;
     private const int FormatVersion = 1;
 
-    internal static PlayerSettings Default { get; } = new(100, true, true);
+    internal static PlayerSettings Default { get; } = new(100, true, true, true, true);
 
     internal float IconScale => IconScalePercent / 100f;
+
+    // ShowBubble is the switch for every bubble; without it only the row icon shows. The card
+    // reminder, the cloud at the hovered card, is one of those bubbles.
+    internal bool ShowsCardReminder => ShowBubble && ShowHandReminder;
 
     // With the own row off, the indicator stays off on that row, icon and bubble alike.
     internal bool ShowsIndicator(bool handHasCard, bool isOwnRow)
@@ -56,7 +60,9 @@ internal sealed record PlayerSettings(int IconScalePercent, bool ShowBubble, boo
             settings = new PlayerSettings(
                 ReadScale(root, "iconScalePercent", Default.IconScalePercent),
                 ReadBool(root, "showBubble", Default.ShowBubble),
-                ReadBool(root, "showOnOwnRow", Default.ShowOnOwnRow));
+                ReadBool(root, "showOnOwnRow", Default.ShowOnOwnRow),
+                ReadBool(root, "showHandReminder", Default.ShowHandReminder),
+                ReadBool(root, "variedBubbleLines", Default.VariedBubbleLines));
             return true;
         }
     }
@@ -71,6 +77,8 @@ internal sealed record PlayerSettings(int IconScalePercent, bool ShowBubble, boo
             writer.WriteNumber("iconScalePercent", IconScalePercent);
             writer.WriteBoolean("showBubble", ShowBubble);
             writer.WriteBoolean("showOnOwnRow", ShowOnOwnRow);
+            writer.WriteBoolean("showHandReminder", ShowHandReminder);
+            writer.WriteBoolean("variedBubbleLines", VariedBubbleLines);
             writer.WriteEndObject();
         }
 

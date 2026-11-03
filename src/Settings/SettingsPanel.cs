@@ -15,6 +15,7 @@ namespace WaitIHaveVuln.Settings;
 /// </summary>
 internal static class SettingsPanel
 {
+    private const int MaxFitPasses = 3;
     private const string SoloHint = "Shows your own row in single-player, from the next run. Off after a restart.";
     private static readonly Color Gold = new(0.94f, 0.78f, 0.25f);
     private static readonly ConditionalWeakTable<NModInfoContainer, Controls> Panels = new();
@@ -50,6 +51,8 @@ internal static class SettingsPanel
                 controls.Root.OffsetRight = image.OffsetRight;
                 controls.Root.OffsetBottom = image.OffsetBottom;
                 controls.Sync();
+                // After layout, when the sizes it measures are current.
+                Callable.From(() => HookGuard.Run("Settings fit", "the settings keep their size", () => controls.FitTo(image))).CallDeferred();
             }
         });
     }
@@ -101,9 +104,11 @@ internal static class SettingsPanel
     {
         private readonly Style _style;
         private readonly BaseButton _showBubble;
+        private readonly BaseButton _variedBubbleLines;
         private readonly BaseButton _showOnOwnRow;
         private readonly HSlider _iconScale;
         private readonly Label _iconScaleValue;
+        private readonly BaseButton _showHandReminder;
         private readonly BaseButton _soloMode;
 
         internal Controls(Style style, Node onScreen)
@@ -112,8 +117,11 @@ internal static class SettingsPanel
             Root = new VBoxContainer { Name = $"{ModEntry.ModId}Settings", Alignment = BoxContainer.AlignmentMode.Center };
             Root.AddThemeConstantOverride("separation", style.FontSize / 3);
 
-            _showBubble = CreateToggle("Show speech bubble");
+            _showBubble = CreateToggle("Show bubbles");
             _showBubble.Toggled += on => Change(nameof(_showBubble), settings => settings with { ShowBubble = on });
+
+            _variedBubbleLines = CreateToggle("Varied bubble lines");
+            _variedBubbleLines.Toggled += on => Change(nameof(_variedBubbleLines), settings => settings with { VariedBubbleLines = on });
 
             _showOnOwnRow = CreateToggle("Show icon on my own row");
             _showOnOwnRow.Toggled += on => Change(nameof(_showOnOwnRow), settings => settings with { ShowOnOwnRow = on });
@@ -151,30 +159,74 @@ internal static class SettingsPanel
             iconScaleRow.AddChild(sliderBox);
             iconScaleRow.AddChild(_iconScaleValue);
 
+            _showHandReminder = CreateToggle("Card reminder");
+            _showHandReminder.Toggled += on => Change(nameof(_showHandReminder), settings => settings with { ShowHandReminder = on });
+
             _soloMode = CreateToggle("Solo mode [dev]");
             _soloMode.Toggled += on => HookGuard.Run(nameof(_soloMode), "solo mode keeps its current state", () => SoloMode.Enabled = on);
             var soloHint = CreateLabel(SoloHint, style.TextColor with { A = 0.7f });
             soloHint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             soloHint.AddThemeFontSizeOverride("font_size", (int)(style.FontSize * 0.8f));
 
-            Root.AddChild(CreateLabel("Settings", Gold));
-            Root.AddChild(_showBubble);
+            // The row icon, the bubbles on top of it, and the developer option, each under its heading.
+            Root.AddChild(CreateLabel("Player list", Gold));
             Root.AddChild(_showOnOwnRow);
             Root.AddChild(iconScaleRow);
+            Root.AddChild(CreateLabel("Bubbles", Gold));
+            Root.AddChild(_showBubble);
+            Root.AddChild(_showHandReminder);
+            Root.AddChild(_variedBubbleLines);
+            Root.AddChild(CreateLabel("Developer", Gold));
             Root.AddChild(_soloMode);
             Root.AddChild(soloHint);
         }
 
         internal VBoxContainer Root { get; }
 
+        // The image slot has a fixed height in the game's scene. When the options need more, the panel
+        // scales down to fit it and widens by the same factor, so it never runs into the author and
+        // version below. The width changes the hint's wrapping, whose height the container updates only
+        // when it lays the panel out again, so each pass measures after a deferred call, until the scale
+        // holds or after a few passes.
+        internal void FitTo(Control slot)
+        {
+            Fit(slot, 1f, 0);
+        }
+
+        private void Fit(Control slot, float scale, int pass)
+        {
+            if (!GodotObject.IsInstanceValid(Root) || !GodotObject.IsInstanceValid(slot) || slot.Size.X <= 0f || slot.Size.Y <= 0f)
+            {
+                return;
+            }
+
+            if (pass > 0)
+            {
+                var needed = Root.GetCombinedMinimumSize().Y;
+                var fit = needed > slot.Size.Y ? slot.Size.Y / needed : 1f;
+                if (Mathf.IsEqualApprox(fit, scale) || pass > MaxFitPasses)
+                {
+                    return;
+                }
+
+                scale = fit;
+            }
+
+            Root.Scale = new Vector2(scale, scale);
+            Root.OffsetRight = slot.OffsetRight + slot.Size.X * (1f / scale - 1f);
+            Callable.From(() => HookGuard.Run("Settings fit", "the settings keep their size", () => Fit(slot, scale, pass + 1))).CallDeferred();
+        }
+
         // Reads the current values without firing the change handlers.
         internal void Sync()
         {
             var settings = SettingsService.Current;
             SetToggle(_showBubble, settings.ShowBubble);
+            SetToggle(_variedBubbleLines, settings.VariedBubbleLines);
             SetToggle(_showOnOwnRow, settings.ShowOnOwnRow);
             _iconScale.SetValueNoSignal(settings.IconScalePercent);
             ShowScale(settings.IconScalePercent);
+            SetToggle(_showHandReminder, settings.ShowHandReminder);
             SetToggle(_soloMode, SoloMode.Enabled);
         }
 

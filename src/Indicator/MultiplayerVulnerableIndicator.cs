@@ -1,7 +1,9 @@
 using System.Runtime.CompilerServices;
 using Godot;
+using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Models;
@@ -62,6 +64,40 @@ internal static class MultiplayerPlayerStateIndicators
         });
     }
 
+    // The rows in their on-screen order, from the hand state rather than the icon, so the icon
+    // options do not change who gets a hand reminder.
+    internal static List<HandReminderRow<Player>> ReminderRows()
+    {
+        var combat = CombatManager.Instance;
+        var rows = new List<(int Index, HandReminderRow<Player> Row)>();
+        foreach (var (row, indicator) in Indicators)
+        {
+            if (!GodotObject.IsInstanceValid(row))
+            {
+                continue;
+            }
+
+            var player = row.Player;
+            rows.Add((row.GetIndex(), new HandReminderRow<Player>(
+                player,
+                LocalContext.IsMe(player),
+                indicator.HoldsCard,
+                player.Creature is { IsAlive: true },
+                indicator.IsConnected,
+                combat.IsPlayerReadyToEndTurn(player),
+                indicator.HoldsCard && CanPlaySupportedCard(player))));
+        }
+
+        return rows.OrderBy(entry => entry.Index).Select(entry => entry.Row).ToList();
+    }
+
+    // The game's own play check (energy and star cost, the Unplayable keyword, powers and relics that
+    // block the play), only read: a teammate who cannot play their card now is not reminded.
+    private static bool CanPlaySupportedCard(Player player)
+    {
+        return player.PlayerCombatState?.Hand.Cards.Any(card => VulnerableCardPredicate.IsSupported(card.Id.Entry) && card.CanPlay()) ?? false;
+    }
+
     private static void Guard(string hook, Action action)
     {
         HookGuard.Run(hook, "the indicator keeps its current state", action);
@@ -107,11 +143,7 @@ internal static class MultiplayerPlayerStateIndicators
     {
         private const float IconSize = 36f;
         private const float Gap = 12f;
-        private const string VulnerableIconPath = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
-        private const string SpeechText = "Wait! I have vuln!";
         private const double SpeechSeconds = 4.0;
-        private static bool _textureLoadAttempted;
-        private static Texture2D? _vulnerableTexture;
         private readonly NMultiplayerPlayerState _row;
         private readonly HBoxContainer _topContainer;
         private readonly Control? _hpBar;
@@ -120,6 +152,7 @@ internal static class MultiplayerPlayerStateIndicators
         private TextureRect? _icon;
         private SceneTree? _frameTree;
         private bool _combatActive;
+        private bool _connected;
 
         internal RowIndicator(NMultiplayerPlayerState row, HBoxContainer topContainer, NHealthBar healthBar, TextureRect portrait)
         {
@@ -130,6 +163,10 @@ internal static class MultiplayerPlayerStateIndicators
             _portrait = portrait;
             _state = new HandIndicatorState<CardModel>(card => card.Id.Entry, OnHandChanged);
         }
+
+        internal bool HoldsCard => _combatActive && _state.IsVisible;
+
+        internal bool IsConnected => _combatActive && _connected;
 
         internal void BeginCombat(bool disconnected)
         {
@@ -144,6 +181,7 @@ internal static class MultiplayerPlayerStateIndicators
                 return;
             }
 
+            _connected = !disconnected;
             if (disconnected)
             {
                 _state.Suspend();
@@ -175,14 +213,18 @@ internal static class MultiplayerPlayerStateIndicators
 
         // The settings are read here and never change while rows exist, because the game
         // greys out Mod Settings during a run.
+        // Runs inside the game's card pile events, so a failure must not reach the draw or the discard.
         private void OnHandChanged(bool hasCard)
         {
-            var settings = SettingsService.Current;
-            var visible = settings.ShowsIndicator(hasCard, LocalContext.IsMe(_row.Player));
-            if (SetVisible(visible) && settings.ShowBubble)
+            HookGuard.Run("Hand change", "the row keeps its icon as it was", () =>
             {
-                ShowSpeechBubble();
-            }
+                var settings = SettingsService.Current;
+                var visible = settings.ShowsIndicator(hasCard, LocalContext.IsMe(_row.Player));
+                if (SetVisible(visible) && settings.ShowBubble)
+                {
+                    ShowSpeechBubble();
+                }
+            });
         }
 
         // Returns true when the icon was just created.
@@ -196,7 +238,7 @@ internal static class MultiplayerPlayerStateIndicators
                 }
 
                 // The icon is the primary signal; without it the bubble would announce nothing.
-                var texture = LoadVulnerableTexture();
+                var texture = VulnerableIcon.Texture;
                 if (texture is null)
                 {
                     return false;
@@ -237,21 +279,24 @@ internal static class MultiplayerPlayerStateIndicators
             return false;
         }
 
+        // Only while the card can still help: its player could play it and an enemy lacks Vulnerable.
         private void ShowSpeechBubble()
         {
-            var creature = _row.Player.Creature;
+            var player = _row.Player;
+            var creature = player.Creature;
             if (creature is null || creature.IsDead)
             {
                 return;
             }
 
-            var bubble = NSpeechBubbleVfx.Create(SpeechText, creature, SpeechSeconds, VfxColor.White);
-            if (bubble is null)
+            var combat = creature.CombatState;
+            var row = new HandReminderRow<Player>(player, LocalContext.IsMe(player), true, true, _connected, CombatManager.Instance.IsPlayerReadyToEndTurn(player));
+            if (!HandReminderPolicy<Player, int>.IsWorthAnnouncing(row, Bubbles.EnemyNeedsVulnerable(combat)))
             {
                 return;
             }
 
-            creature.GetVfxContainer()?.AddChildSafely(bubble);
+            Bubbles.Say(player, () => Bubbles.NextRow(combat, player), SpeechSeconds);
         }
 
         // Powers tween in and the name label resizes its font without a layout signal on the row,
@@ -385,33 +430,6 @@ internal static class MultiplayerPlayerStateIndicators
             var font = label.GetThemeFont("font");
             var width = font.GetStringSize(label.Text, HorizontalAlignment.Left, -1f, label.GetThemeFontSize("font_size")).X;
             return Mathf.Min(rect.End.X, (label.GetGlobalTransform() * new Vector2(width, 0f)).X);
-        }
-
-        // Loaded once per process. A failure is logged once and leaves the icon off until restart.
-        private static Texture2D? LoadVulnerableTexture()
-        {
-            if (_textureLoadAttempted)
-            {
-                return _vulnerableTexture;
-            }
-
-            _textureLoadAttempted = true;
-            try
-            {
-                _vulnerableTexture = ResourceLoader.Load<Texture2D>(VulnerableIconPath);
-            }
-            catch (Exception exception)
-            {
-                Log.Warn($"[{ModEntry.ModId}] Could not load the Vulnerable icon at '{VulnerableIconPath}': {exception.Message}");
-                return null;
-            }
-
-            if (_vulnerableTexture is null)
-            {
-                Log.Warn($"[{ModEntry.ModId}] Could not load the Vulnerable icon at '{VulnerableIconPath}'.");
-            }
-
-            return _vulnerableTexture;
         }
     }
 }

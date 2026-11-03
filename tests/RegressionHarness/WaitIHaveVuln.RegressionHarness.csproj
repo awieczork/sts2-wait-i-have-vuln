@@ -12,6 +12,17 @@
     <Compile Include="../../src/Indicator/VulnerableCardPredicate.cs" Link="VulnerableCardPredicate.cs" />
     <Compile Include="../../src/Indicator/ICardHand.cs" Link="ICardHand.cs" />
     <Compile Include="../../src/Indicator/HandIndicatorState.cs" Link="HandIndicatorState.cs" />
+    <Compile Include="../../src/Indicator/HandReminderRow.cs" Link="HandReminderRow.cs" />
+    <Compile Include="../../src/Indicator/HandReminderPolicy.cs" Link="HandReminderPolicy.cs" />
+    <Compile Include="../../src/Indicator/BubbleLine.cs" Link="BubbleLine.cs" />
+    <Compile Include="../../src/Indicator/BubbleLines.cs" Link="BubbleLines.cs" />
+    <Compile Include="../../src/Indicator/BubbleLinePool.cs" Link="BubbleLinePool.cs" />
+    <Compile Include="../../src/Indicator/BubbleBoard.cs" Link="BubbleBoard.cs" />
+    <Compile Include="../../src/Indicator/BubbleVoice.cs" Link="BubbleVoice.cs" />
+    <Compile Include="../../src/Indicator/Box.cs" Link="Box.cs" />
+    <Compile Include="../../src/Indicator/CloudSide.cs" Link="CloudSide.cs" />
+    <Compile Include="../../src/Indicator/CloudSpot.cs" Link="CloudSpot.cs" />
+    <Compile Include="../../src/Indicator/CloudPlacement.cs" Link="CloudPlacement.cs" />
     <Compile Include="../../src/Settings/PlayerSettings.cs" Link="PlayerSettings.cs" />
     <Compile Include="../../src/Settings/SettingsLoadOutcome.cs" Link="SettingsLoadOutcome.cs" />
     <Compile Include="../../src/Settings/SettingsStore.cs" Link="SettingsStore.cs" />

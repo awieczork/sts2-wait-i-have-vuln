@@ -1,6 +1,8 @@
 using WaitIHaveVuln.Indicator;
 using WaitIHaveVuln.Settings;
 
+using Policy = WaitIHaveVuln.Indicator.HandReminderPolicy<string, int>;
+
 namespace WaitIHaveVuln.RegressionHarness;
 
 internal static class Program
@@ -15,7 +17,12 @@ internal static class Program
         VerifyLocalAndRemoteRows,
         VerifySettingsParsing,
         VerifyIndicatorVisibilityRule,
-        VerifySettingsStore
+        VerifySettingsStore,
+        VerifyCardClouds,
+        VerifyReactions,
+        VerifyBubbleLines,
+        VerifyBubbleVoice,
+        VerifyCloudPlacement
     };
 
     private static int _assertions;
@@ -238,11 +245,15 @@ internal static class Program
     private static void VerifySettingsParsing()
     {
         var defaults = PlayerSettings.Default;
-        Assert(defaults == new PlayerSettings(100, true, true), "Defaults are 100% icon, bubble on, own row on.");
+        Assert(defaults == new PlayerSettings(100, true, true, true, true), "Defaults are 100% icon, bubbles on, own row on, card reminder on, varied lines on.");
 
-        Assert(PlayerSettings.TryParse("""{"iconScalePercent":150,"showBubble":false,"showOnOwnRow":false}""", out var full)
-            && full == new PlayerSettings(150, false, false), "A complete file is read as written.");
+        Assert(PlayerSettings.TryParse("""{"iconScalePercent":150,"showBubble":false,"showOnOwnRow":false,"showHandReminder":false,"variedBubbleLines":false}""", out var full)
+            && full == new PlayerSettings(150, false, false, false, false), "A complete file is read as written.");
         Assert(PlayerSettings.TryParse("{}", out var empty) && empty == defaults, "Missing fields take their defaults.");
+        Assert(PlayerSettings.TryParse("""{"version":1,"iconScalePercent":120,"showBubble":false,"showOnOwnRow":true}""", out var older)
+            && older == new PlayerSettings(120, false, true, true, true), "A v0.2.0 file keeps its bubble choice and reads with the card reminder and varied lines on.");
+        Assert(PlayerSettings.TryParse("""{"showHandReminder":false,"handReminderSound":true}""", out var armBuild) && armBuild == defaults with { ShowHandReminder = false },
+            "A file from the arm builds keeps its card reminder choice, and its sound choice is ignored.");
         Assert(PlayerSettings.TryParse("""{"iconScalePercent":10}""", out var low) && low.IconScalePercent == 50, "A scale below the range clamps to 50%.");
         Assert(PlayerSettings.TryParse("""{"iconScalePercent":1e9}""", out var high) && high.IconScalePercent == 150, "A scale above the range clamps to 150%.");
         Assert(PlayerSettings.TryParse("""{"iconScalePercent":200}""", out var oldTop) && oldTop.IconScalePercent == 150, "The former 200% top clamps to 150%.");
@@ -250,7 +261,7 @@ internal static class Program
         Assert(PlayerSettings.TryParse("""{"iconScalePercent":-1e400}""", out var below) && below.IconScalePercent == 50, "A negative number beyond double's range clamps to 50%.");
         Assert(PlayerSettings.TryParse("""{"iconScalePercent":134}""", out var down) && down.IconScalePercent == 130, "A scale snaps down to its step.");
         Assert(PlayerSettings.TryParse("""{"iconScalePercent":125}""", out var mid) && mid.IconScalePercent == 130, "A scale halfway between steps rounds up.");
-        Assert(PlayerSettings.TryParse("""{"iconScalePercent":"big","showBubble":1,"showOnOwnRow":null}""", out var wrong) && wrong == defaults,
+        Assert(PlayerSettings.TryParse("""{"iconScalePercent":"big","showBubble":1,"showOnOwnRow":null,"showHandReminder":"yes","variedBubbleLines":"no"}""", out var wrong) && wrong == defaults,
             "Wrong-typed fields take their defaults.");
         Assert(PlayerSettings.TryParse("""{"version":7,"future":[1,2],"showBubble":false}""", out var unknown) && unknown == defaults with { ShowBubble = false },
             "Unknown fields are ignored and known fields still read.");
@@ -260,10 +271,15 @@ internal static class Program
             Assert(!PlayerSettings.TryParse(damaged, out var fallback) && fallback == defaults, $"'{damaged}' is damaged and gives the defaults.");
         }
 
-        var written = new PlayerSettings(70, false, true);
+        var written = new PlayerSettings(70, false, true, true, false);
         Assert(PlayerSettings.TryParse(written.ToJson(), out var roundTrip) && roundTrip == written, "Written settings read back unchanged.");
-        Assert(new PlayerSettings(-5, true, true).Normalize().IconScalePercent == 50, "Normalize clamps a scale set in code.");
-        Assert(Math.Abs(new PlayerSettings(150, true, true).IconScale - 1.5f) < 0.0001f, "The icon scale is the percent as a factor.");
+        Assert(!written.ToJson().Contains("handReminderSound", StringComparison.Ordinal), "The sound option is no longer written.");
+        Assert(new PlayerSettings(-5, true, true, true, true).Normalize().IconScalePercent == 50, "Normalize clamps a scale set in code.");
+        Assert(Math.Abs(new PlayerSettings(150, true, true, true, true).IconScale - 1.5f) < 0.0001f, "The icon scale is the percent as a factor.");
+
+        Assert(defaults.ShowsCardReminder, "By default the card reminder shows.");
+        Assert(!(defaults with { ShowBubble = false }).ShowsCardReminder, "With bubbles off, the card reminder is off too, whatever its own switch says.");
+        Assert(!(defaults with { ShowHandReminder = false }).ShowsCardReminder, "With the card reminder off, no cloud shows.");
     }
 
     private static void VerifyIndicatorVisibilityRule()
@@ -275,6 +291,7 @@ internal static class Program
         Assert(shown.ShowsIndicator(true, false) && shown.ShowsIndicator(true, true), "By default both your row and teammates' rows show the indicator.");
         Assert(!ownRowOff.ShowsIndicator(true, true), "With the own row off, your own row shows nothing.");
         Assert(ownRowOff.ShowsIndicator(true, false), "With the own row off, teammates' rows still show the indicator.");
+        Assert((shown with { ShowBubble = false }).ShowsIndicator(true, false), "With bubbles off, the row icon still shows.");
     }
 
     private static void VerifySettingsStore()
@@ -286,7 +303,7 @@ internal static class Program
             Assert(store.Load(out var missing) == SettingsLoadOutcome.Missing && missing == PlayerSettings.Default, "A missing file gives the defaults.");
             Assert(!Directory.Exists(Path.Combine(directory, "nested")), "Loading a missing file writes nothing.");
 
-            var saved = new PlayerSettings(140, false, true);
+            var saved = new PlayerSettings(140, false, true, false, true);
             store.Save(saved);
             Assert(store.Load(out var loaded) == SettingsLoadOutcome.Loaded && loaded == saved, "Saved settings load back, creating the directory.");
             Assert(!File.Exists(store.FilePath + ".tmp"), "Saving leaves no temporary file.");
@@ -315,6 +332,227 @@ internal static class Program
                 Directory.Delete(directory, recursive: true);
             }
         }
+    }
+
+    private static void VerifyCardClouds()
+    {
+        var own = Row("me", isOwnRow: true);
+        var ally = Row("ally");
+
+        Assert(Policy.ShowsCloud(true, false, true, false, true, new[] { own, ally }), "In co-op a teammate holding a card brings the cloud.");
+        Assert(!Policy.ShowsCloud(true, false, true, false, true, new[] { own }), "In co-op your own row alone brings no cloud.");
+        Assert(Policy.ShowsCloud(true, false, true, true, true, new[] { own }), "In solo mode your own row brings the cloud.");
+
+        var notNeeded = new[]
+        {
+            Row("empty", holdsCard: false),
+            Row("dead", isAlive: false),
+            Row("away", isConnected: false),
+            Row("done", isReadyToEndTurn: true)
+        };
+        Assert(!Policy.ShowsCloud(true, false, true, true, true, notNeeded), "Rows without a card, dead, disconnected, or ready to end turn bring no cloud.");
+        Assert(Policy.ShowsCloud(true, false, true, false, true, notNeeded.Append(ally)), "One needed teammate among the others brings the cloud.");
+        Assert(!Policy.ShowsCloud(true, false, true, false, false, new[] { ally }), "No cloud shows when every enemy already has Vulnerable.");
+        Assert(!Policy.ShowsCloud(true, false, false, false, true, new[] { ally }), "No cloud shows while the local player cannot act.");
+        Assert(!Policy.ShowsCloud(false, false, true, false, true, new[] { ally }), "Hovering a card that is not an Attack shows no cloud.");
+        Assert(!Policy.ShowsCloud(true, true, true, false, true, new[] { ally }), "Hovering an Attack that applies Vulnerable itself shows no cloud.");
+        Assert(!Policy.ShowsCloud(true, false, true, false, true, new[] { Row("broke", canPlayCard: false) }),
+            "A teammate who cannot play their card now, for energy or anything else the game checks, brings no cloud.");
+        Assert(Policy.IsWorthAnnouncing(Row("broke", canPlayCard: false), true), "The card arriving is still announced over the teammate, as before.");
+
+        Assert(Policy.IsWorthAnnouncing(own, true) && !Policy.IsWorthAnnouncing(own, false),
+            "A bubble announces a card only while an enemy lacks Vulnerable.");
+        Assert(!Policy.IsWorthAnnouncing(Row("done", isReadyToEndTurn: true), true), "A bubble stays quiet for a player who ended the turn.");
+    }
+
+    private static void VerifyReactions()
+    {
+        var policy = new Policy();
+        var rows = new[] { Row("me", isOwnRow: true), Row("ally"), Row("other", holdsCard: false) };
+
+        Assert(policy.AttackPlayed(1, "me", false, true, rows).SequenceEqual(new[] { ("ally", 1) }),
+            "Your Attack makes a teammate holding a card react, as the first Attack of the turn.");
+        Assert(policy.AttackPlayed(1, "other", false, true, rows).SequenceEqual(new[] { ("ally", 2) }), "Another teammate's Attack counts too.");
+        Assert(policy.AttackPlayed(1, "me", false, true, rows).SequenceEqual(new[] { ("ally", 3) }), "Each Attack in the turn raises the count.");
+        Assert(policy.AttackPlayed(1, "ally", false, true, rows).Count == 0, "The holder's own Attack brings no reaction.");
+        Assert(policy.AttackPlayed(1, "me", false, false, rows).Count == 0, "Once every enemy has Vulnerable, nobody reacts.");
+        Assert(policy.AttackPlayed(1, "me", false, true, rows).SequenceEqual(new[] { ("ally", 4) }), "An Attack nobody reacts to does not count.");
+        Assert(policy.AttackPlayed(2, "me", false, true, rows).SequenceEqual(new[] { ("ally", 1) }), "A new turn starts the count again.");
+
+        foreach (var (row, what) in new[]
+        {
+            (Row("ally", holdsCard: false), "who has played the card"),
+            (Row("ally", isReadyToEndTurn: true), "who ended the turn"),
+            (Row("ally", isConnected: false), "who disconnected"),
+            (Row("ally", isAlive: false), "who died"),
+            (Row("ally", canPlayCard: false), "who cannot play their card now")
+        })
+        {
+            Assert(policy.AttackPlayed(2, "me", false, true, new[] { row }).Count == 0, $"A teammate {what} does not react.");
+        }
+
+        var two = new Policy();
+        var holders = new[] { Row("a"), Row("b") };
+        Assert(two.AttackPlayed(1, "me", false, true, holders).SequenceEqual(new[] { ("a", 1), ("b", 1) }), "Every teammate holding a card reacts, in row order.");
+        Assert(two.AttackPlayed(1, "a", false, true, holders).SequenceEqual(new[] { ("b", 2) }), "A holder's Attack makes the other holder react, and not itself.");
+
+        Assert(new Policy().AttackPlayed(1, "ally", false, true, new[] { Row("me", isOwnRow: true) }).Count == 0, "In co-op your own row never reacts.");
+        Assert(new Policy().AttackPlayed(1, "me", true, true, new[] { Row("me", isOwnRow: true) }).SequenceEqual(new[] { ("me", 1) }),
+            "In solo mode your own Attack counts for your own row, which stands for a teammate.");
+    }
+
+    private static void VerifyBubbleLines()
+    {
+        Assert(BubbleLines.CleanName(null) is null && BubbleLines.CleanName("  ") is null && BubbleLines.CleanName("[]") is null, "Missing or empty names give no name.");
+        Assert(BubbleLines.CleanName(" [b]Lim[/b] ") == "bLim/b", "Square brackets are removed and the name trimmed.");
+        Assert(BubbleLines.CleanName("A\nB") == "AB", "Control characters are removed.");
+        var cut = BubbleLines.CleanName("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        Assert(cut is { Length: BubbleLines.MaxNameLength } && cut.EndsWith('…'), "A long name is cut to 16 characters with an ellipsis.");
+        // The emoji's two halves sit at the cut, characters 15 and 16.
+        var emoji = BubbleLines.CleanName(new string('A', 14) + "\U0001F600" + "BCDEF");
+        Assert(emoji is not null && !emoji.Any(char.IsSurrogate) && emoji.Length <= BubbleLines.MaxNameLength, "A cut never splits an emoji in half.");
+        Assert(BubbleLines.Fill("{you}, wait!", null, "B") is null && BubbleLines.Fill("{them} here!", "A", null) is null, "A line whose name is missing is skipped.");
+        Assert(BubbleLines.Fill("{you}, wait!", "A", null) == "A, wait!" && BubbleLines.Fill("{them} here!", null, "B") == "B here!", "Names fill their places.");
+        Assert(BubbleLines.Fill("{attacker}, wait!", "A", "B") is null && BubbleLines.Fill("{attacker}, wait!", null, null, "C") == "C, wait!",
+            "The attacker's name fills its place, and a line needing it is skipped without it.");
+        Assert(BubbleLines.Row[0] == BubbleLines.Signature && !BubbleLines.Angry.Any(tier => tier.Contains(BubbleLines.Signature)),
+            "The signature is a row line and never an angry one.");
+
+        var never = (Func<BubbleLine, bool>)(_ => false);
+        var three = new BubbleLinePool(new[] { "a", "b", "c" }, new Random(7));
+        var picks = Enumerable.Range(0, 30).Select(_ => three.Next(null, never, null, null)!.Value.Text).ToList();
+        for (var pass = 0; pass < 10; pass++)
+        {
+            Assert(picks.Skip(pass * 3).Take(3).OrderBy(text => text).SequenceEqual(new[] { "a", "b", "c" }), $"Pass {pass} uses every line once.");
+        }
+
+        Assert(picks.Zip(picks.Skip(1)).All(pair => pair.First != pair.Second), "No line comes twice in a row, also across refills.");
+
+        var board = new BubbleBoard();
+        board.Add(new BubbleLine("a"), 5);
+        var avoiding = new BubbleLinePool(new[] { "a", "b" }, new Random(3));
+        Assert(Enumerable.Range(0, 6).Select(_ => avoiding.Next(null, line => board.Contains(line, 1), null, null)).All(line => line is null || line.Value.Text == "b"),
+            "A line on screen is never picked.");
+        Assert(board.Contains(new BubbleLine("a"), 4.9) && !board.Contains(new BubbleLine("a"), 5), "A bubble leaves the board when it goes away.");
+        board.Remove(new BubbleLine("a"));
+        Assert(!board.Contains(new BubbleLine("a"), 1), "A bubble taken down early leaves the board.");
+
+        var row = new BubbleLinePool(BubbleLines.Row, new Random(11), BubbleLines.Signature);
+        Assert(row.Next("fight 1", never, "A", null)!.Value.Text == BubbleLines.Signature, "The first row bubble of a combat is the signature.");
+        Assert(Enumerable.Range(0, 7).All(_ => row.Next("fight 1", never, "A", null)!.Value.Text != BubbleLines.Signature),
+            "The signature does not repeat within its pass.");
+        Assert(row.Next("fight 2", never, "A", null)!.Value.Text == BubbleLines.Signature, "A new combat opens with the signature again.");
+        Assert(row.Next("fight 3", line => line.Text == BubbleLines.Signature, "A", null)!.Value.Text != BubbleLines.Signature,
+            "When the signature is already on screen, another line opens the combat.");
+
+        var first = BubbleLines.Angry[0];
+        var nameless = new BubbleLinePool(first, new Random(5));
+        Assert(Enumerable.Range(0, 40).Select(_ => nameless.Next(null, never, null, null)!.Value.Text).All(text => !text.Contains('{')),
+            "Without names, lines that need one are never picked.");
+        var named = new BubbleLinePool(first, new Random(5));
+        var namedPicks = Enumerable.Range(0, first.Count).Select(_ => named.Next(null, never, "A", "B", "C")!.Value.Text).ToHashSet();
+        Assert(namedPicks.Count == first.Count && namedPicks.Contains("C, wait!"), "With names, one pass uses every line of a tier, filled.");
+    }
+
+    private static void VerifyBubbleVoice()
+    {
+        var never = (Func<BubbleLine, bool>)(_ => false);
+        Assert(BubbleLines.Angry.Count == 3 && BubbleLines.Angry.All(tier => tier.Any(line => line.Contains(BubbleLines.Attacker, StringComparison.Ordinal))),
+            "There are three angry tiers, each with a line naming the attacker.");
+        Assert(BubbleVoice.AngryTier(1) == 0 && BubbleVoice.AngryTier(2) == 1 && BubbleVoice.AngryTier(3) == 2 && BubbleVoice.AngryTier(9) == 2,
+            "The first Attack takes the first tier, the second the second, and every later one the third.");
+
+        var voice = new BubbleVoice(new Random(13));
+        for (var count = 1; count <= 4; count++)
+        {
+            var tier = BubbleLines.Angry[BubbleVoice.AngryTier(count)].Select(line => BubbleLines.Fill(line, "A", "B", "C")).ToHashSet();
+            Assert(voice.NextAngry(true, count, never, "A", "B", "C") is { } line && tier.Contains(line.Text), $"Attack {count} picks from its tier.");
+        }
+
+        Assert(voice.NextAngry(false, 3, never, "A", "B", "C")?.Text == BubbleLines.FixedAngry, "With varied lines off, every Attack gets the fixed line.");
+        Assert(voice.NextAngry(false, 1, line => line.Text == BubbleLines.FixedAngry, "A", "B", "C")?.Text == BubbleLines.FixedAngry
+            && voice.NextRow(false, "fight", line => line.Text == BubbleLines.Signature, "A", "B")?.Text == BubbleLines.Signature,
+            "With varied lines off, a fixed line shows for every speaker, even while another says it.");
+        Assert(voice.NextRow(false, "fight", never, "A", "B")?.Text == BubbleLines.Signature && voice.NextRow(false, "fight", never, "A", "B")?.Text == BubbleLines.Signature,
+            "With varied lines off, the row always says the signature.");
+        Assert(voice.NextRow(true, "fight", never, "A", "B")?.Text == BubbleLines.Signature, "With varied lines on, each combat still opens with the signature.");
+
+        var noAttacker = new BubbleVoice(new Random(17));
+        Assert(Enumerable.Range(0, 40).Select(_ => noAttacker.NextAngry(true, 1, never, "A", "B", null)!.Value.Text).All(text => !text.Contains('{')),
+            "Without the attacker's name, the line naming them is never picked.");
+    }
+
+    private static void VerifyCloudPlacement()
+    {
+        var screen = new Box(0, 0, 1920, 1080);
+        var card = new Box(800, 400, 300, 420);
+        const float width = 80;
+        const float height = 60;
+        const float gap = 10;
+        var tipsRight = new[] { new Box(1110, 450, 300, 200) };
+        var tipsLeft = new[] { new Box(490, 450, 300, 200) };
+
+        Assert(new Box(0, 0, 10, 10).Intersects(new Box(5, 5, 10, 10)) && !new Box(0, 0, 10, 10).Intersects(new Box(10, 0, 10, 10)),
+            "Boxes that overlap intersect, and boxes that only touch do not.");
+        Assert(new Box(10, 10, 20, 20).Grow(5) == new Box(5, 5, 30, 30), "A box grows by the same amount on every side.");
+
+        var left = CloudPlacement.Place(card, tipsRight, screen, width, height, gap);
+        Assert(left is { Side: CloudSide.Left } spot && spot.Cloud == new Box(710, 400, width, height),
+            "With tips on the right, the cloud sits at the card's top-left corner, a gap away.");
+        var right = CloudPlacement.Place(card, tipsLeft, screen, width, height, gap);
+        Assert(right is { Side: CloudSide.Right } other && other.Cloud == new Box(1110, 400, width, height),
+            "With tips on the left, the cloud sits at the card's top-right corner.");
+        Assert(CloudPlacement.Place(new Box(200, 400, 300, 420), Array.Empty<Box>(), screen, width, height, gap) is { Side: CloudSide.Right },
+            "Without tips, the side with more room comes first: right of a card on the left.");
+        Assert(CloudPlacement.Place(new Box(1400, 400, 300, 420), Array.Empty<Box>(), screen, width, height, gap) is { Side: CloudSide.Left },
+            "Without tips, a card on the right gets its cloud on the left.");
+
+        var farLeft = new Box(5, 400, 300, 420);
+        Assert(CloudPlacement.Place(farLeft, new[] { new Box(315, 450, 300, 200) }, screen, width, height, gap) is { Side: CloudSide.Above } above
+            && above.Cloud == new Box(115, 330, width, height),
+            "The far-left card with tips on its right gets the cloud above it, centred.");
+        var farRight = new Box(1615, 400, 300, 420);
+        Assert(CloudPlacement.Place(farRight, new[] { new Box(1305, 450, 300, 200) }, screen, width, height, gap) is { Side: CloudSide.Above },
+            "The far-right card with tips on its left gets the cloud above it.");
+        Assert(CloudPlacement.Place(farLeft, Array.Empty<Box>(), screen, width, height, gap) is { Side: CloudSide.Right },
+            "The far-left card without tips gets the cloud on its right.");
+
+        Assert(CloudPlacement.Place(card, tipsLeft.Concat(tipsRight).ToList(), screen, width, height, gap) is { Side: CloudSide.Above } bothSides
+            && bothSides.Cloud == new Box(910, 330, width, height),
+            "With tips on both sides and room above, the cloud sits above the card.");
+
+        var top = new Box(800, 20, 300, 420);
+        Assert(CloudPlacement.Place(top, new[] { new Box(490, 30, 300, 200), new Box(1110, 30, 300, 200) }, screen, width, height, gap) is null,
+            "With tips on both sides and no room above, no cloud shows.");
+
+        Assert(CloudPlacement.Place(new Box(800, 1030, 300, 40), Array.Empty<Box>(), screen, width, height, gap) is { Side: CloudSide.Above } low
+            && low.Cloud == new Box(910, 960, width, height),
+            "A card too low for a cloud beside its top gets the cloud above it.");
+
+        foreach (var placed in new[] { left, right })
+        {
+            Assert(placed is { } found && !found.Cloud.Intersects(card) && found.Cloud.IsInside(screen),
+                "A cloud never overlaps the hovered card or leaves the screen.");
+        }
+
+        Assert(CloudPlacement.Place(card, tipsRight, screen, 0, height, gap) is null, "A cloud without a size gets no spot.");
+
+        Assert(!CloudPlacement.IsSettled(0, 0.1), "The cloud waits a moment even for a card already at rest.");
+        Assert(CloudPlacement.IsSettled(0.5f, 0.15), "After that moment, a card within a unit of its spot has settled.");
+        Assert(!CloudPlacement.IsSettled(26, 0.15), "A card still sliding sideways to its spot has not settled.");
+        Assert(CloudPlacement.IsSettled(26, 0.6), "After the longest wait the cloud shows even if the card has not settled.");
+    }
+
+    private static HandReminderRow<string> Row(
+        string player,
+        bool isOwnRow = false,
+        bool holdsCard = true,
+        bool isAlive = true,
+        bool isConnected = true,
+        bool isReadyToEndTurn = false,
+        bool canPlayCard = true)
+    {
+        return new HandReminderRow<string>(player, isOwnRow, holdsCard, isAlive, isConnected, isReadyToEndTurn, canPlayCard);
     }
 
     private static HandIndicatorState<FakeCard> CreateState(Action<bool> setVisible)
