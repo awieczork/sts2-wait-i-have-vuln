@@ -45,6 +45,7 @@ The VS Code task `build (safe)` runs the same build.
 
 The harness covers the supported card set, hand transitions, rebinding, suspended tracking, owner cleanup, independent local and remote rows, settings parsing, clamping, and migration, the own-row visibility rule, saving and loading the settings file, when the card cloud and the teammates' reactions show, the bubble lines, and where the cloud goes at the hovered card.
 It does not load the game, so it cannot verify resource loading, layout, the settings panel, or multiplayer behaviour.
+The harness treats compiler warnings as errors, and GitHub Actions runs it on every push to `main` and every pull request; CI does not build the mod itself, because that build needs the game's assemblies.
 
 ## Deploy to your game
 
