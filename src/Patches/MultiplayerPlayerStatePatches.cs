@@ -1,3 +1,4 @@
+using System.Reflection;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Nodes.Combat;
@@ -11,6 +12,13 @@ namespace WaitIHaveVuln.Patches;
 [HarmonyPatch(typeof(NMultiplayerPlayerState), "OnCombatSetUp")]
 internal static class MultiplayerPlayerStateCombatSetUpPatch
 {
+    // Harmony calls it first with no target, before it binds anything.
+    private static bool Prepare(MethodBase? original)
+    {
+        return original is not null || PatchTarget.Exists(nameof(MultiplayerPlayerStateCombatSetUpPatch), "the row icon and bubbles", typeof(NMultiplayerPlayerState), "OnCombatSetUp", null,
+            "_topContainer", "_healthBar", "_characterIcon");
+    }
+
     [HarmonyPostfix]
     private static void Postfix(
         NMultiplayerPlayerState __instance,
@@ -26,6 +34,12 @@ internal static class MultiplayerPlayerStateCombatSetUpPatch
 [HarmonyPatch(typeof(NMultiplayerPlayerState), "RefreshConnectedState", new Type[0])]
 internal static class MultiplayerPlayerStateConnectionStatePatch
 {
+    // Harmony calls it first with no target, before it binds anything.
+    private static bool Prepare(MethodBase? original)
+    {
+        return original is not null || PatchTarget.Exists(nameof(MultiplayerPlayerStateConnectionStatePatch), "the row's disconnect handling", typeof(NMultiplayerPlayerState), "RefreshConnectedState", Type.EmptyTypes);
+    }
+
     [HarmonyPostfix]
     private static void Postfix(NMultiplayerPlayerState __instance)
     {
@@ -36,6 +50,12 @@ internal static class MultiplayerPlayerStateConnectionStatePatch
 [HarmonyPatch(typeof(NMultiplayerPlayerState), "OnCombatEnded")]
 internal static class MultiplayerPlayerStateCombatEndedPatch
 {
+    // Harmony calls it first with no target, before it binds anything.
+    private static bool Prepare(MethodBase? original)
+    {
+        return original is not null || PatchTarget.Exists(nameof(MultiplayerPlayerStateCombatEndedPatch), "hiding the row icon at combat end", typeof(NMultiplayerPlayerState), "OnCombatEnded");
+    }
+
     [HarmonyPostfix]
     private static void Postfix(NMultiplayerPlayerState __instance)
     {
@@ -43,9 +63,15 @@ internal static class MultiplayerPlayerStateCombatEndedPatch
     }
 }
 
-[HarmonyPatch(typeof(NMultiplayerPlayerState), "_ExitTree")]
+[HarmonyPatch(typeof(NMultiplayerPlayerState), nameof(NMultiplayerPlayerState._ExitTree))]
 internal static class MultiplayerPlayerStateExitTreePatch
 {
+    // Harmony calls it first with no target, before it binds anything.
+    private static bool Prepare(MethodBase? original)
+    {
+        return original is not null || PatchTarget.Exists(nameof(MultiplayerPlayerStateExitTreePatch), "the row's cleanup", typeof(NMultiplayerPlayerState), nameof(NMultiplayerPlayerState._ExitTree));
+    }
+
     [HarmonyPostfix]
     private static void Postfix(NMultiplayerPlayerState __instance)
     {
