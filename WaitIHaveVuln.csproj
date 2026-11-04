@@ -28,8 +28,13 @@
     </Reference>
   </ItemGroup>
 
+  <!-- The SDK compiles every .cs below the project folder; the harness and the folders .gitignore keeps
+       local are not part of the mod. -->
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
+    <Compile Remove="decompiled/**/*.cs" />
+    <Compile Remove="references/**/*.cs" />
+    <Compile Remove="tools/**/*.cs" />
   </ItemGroup>
 
   <Target Name="ValidateGameReferences" BeforeTargets="ResolveReferences" Condition="'$(DesignTimeBuild)' != 'true'">
