@@ -1,8 +1,13 @@
 # Bring your normal progress into modded mode
 
 When mods are on, Slay the Spire 2 keeps **separate modded save profiles**.
-The first time you play with mods, your unlocks, settings, and run history from normal play are not there.
+The first time you play with mods, your unlocks, run history, and play preferences such as fast mode are not there.
+Your game settings, such as display, audio, and language, stay the same, because both modes share them.
 Your normal saves are not changed and come back when you turn mods off.
+
+The game switches to the modded profiles even when a mod fails to load, so a broken mod alone is enough.
+In co-op, the lobby offers only the highest ascension that every player has unlocked.
+A fresh modded profile has none unlocked, so it can hold back your whole group until you copy your progress.
 
 This guide copies your normal progress into the modded profile, either with a script or by hand.
 A run that is still in progress is not copied, so finish or abandon it first.
