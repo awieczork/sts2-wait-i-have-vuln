@@ -16,6 +16,9 @@ It shows who holds a card that applies Vulnerable, so your team applies it befor
 During a co-op combat:
 
 - **Vulnerable icon.** During your team's turn, the Vulnerable icon appears next to a player's name in the top-left player list while they hold a supported card. It is bright while they can play the card, and dimmed while they cannot, for example without the energy. Your own row is included.
+
+  ![The dimmed Vulnerable icon on a player's row while Bash is in hand with only 1 energy left](docs/images/dimmed-icon.jpg)
+
 - **"Wait! I have vuln!"** When a player's icon turns bright, for example when they draw Bash or gain the energy to play it, their character says so in a speech bubble for four seconds. It shows only while an enemy still needs Vulnerable and the player has not ended their turn, and it goes away once they can no longer play the card. The first bubble of each combat is always "Wait! I have vuln!"; later ones vary, and some call you by name.
 - **Card reminder.** Hover an Attack you can play while a teammate's icon is bright, and a thought cloud with the Vulnerable icon appears beside your card and moves with it. Attacks that apply Vulnerable themselves get no cloud.
 
@@ -37,7 +40,7 @@ Set these on the main menu before you start or continue a run, under **Settings 
 
 Your choices are kept for the next game in `%APPDATA%\SlayTheSpire2\WaitIHaveVuln\settings.json`.
 
-<img src="docs/images/settings.png" alt="The mod's settings panel, grouped under Player list, Bubbles, and Developer" width="420">
+![The mod's settings panel in Mod Settings, grouped under Player list, Bubbles, and Developer](docs/images/settings.jpg)
 
 ### Supported cards
 
