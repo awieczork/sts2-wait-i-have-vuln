@@ -26,9 +26,9 @@ internal static class CombatHistoryCardPlayStartedPatch
         HookGuard.Run("Card play started", "no teammate reacts to the Attack", () =>
         {
             if (__1.IsFirstInSeries && !__1.IsAutoPlay && __1.Card is { Type: CardType.Attack, Owner: { } attacker } card
-                && !VulnerableCardPredicate.IsSupported(card.Id.Entry))
+                && !SupportedCards.IsSupported(card))
             {
-                HandReminders.OnAttackPlayed(attacker, __0);
+                HandReminders.OnAttackPlayed(attacker, __0, __1.Target);
             }
         });
     }

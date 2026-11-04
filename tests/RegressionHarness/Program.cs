@@ -10,11 +10,16 @@ internal static class Program
     private static readonly Action[] Cases =
     {
         VerifyExactSupportedSet,
-        VerifyHandTransitions,
-        VerifyRebindingAndCombatEnd,
-        VerifyInterruptedTracking,
-        VerifyOwnerCleanup,
-        VerifyLocalAndRemoteRows,
+        VerifyMadScienceRider,
+        VerifyIndicatorLevel,
+        VerifyCommitGate,
+        VerifyRowTransitions,
+        VerifyPendingChange,
+        VerifyReminderLevel,
+        VerifyVulnerableNeed,
+        VerifyReactionTurn,
+        VerifyArrivalQueue,
+        VerifyGameBubbleTiming,
         VerifySettingsParsing,
         VerifyIndicatorVisibilityRule,
         VerifySettingsStore,
@@ -77,169 +82,157 @@ internal static class Program
         }
     }
 
-    private static void VerifyHandTransitions()
+    private static void VerifyMadScienceRider()
     {
-        var hand = new FakeHand();
-        var visibilityChanges = new List<bool>();
-        using var state = CreateState(visibilityChanges.Add);
-
-        state.Bind(hand);
-        Assert(!state.IsVisible, "An empty hand starts hidden.");
-        hand.Add("VICIOUS");
-        Assert(!state.IsVisible, "An unsupported card does not show the indicator.");
-        state.Bind(hand);
-        Assert(hand.AddedSubscriptions == 1 && hand.RemovedSubscriptions == 1, "Repeated binding does not duplicate listeners.");
-
-        var first = hand.Add("BASH");
-        Assert(state.IsVisible, "The first supported card shows the indicator.");
-        var second = hand.Add("UPPERCUT");
-        Assert(state.IsVisible && visibilityChanges.Count == 1, "Two supported cards still produce one visible indicator.");
-        hand.Remove(first);
-        Assert(state.IsVisible, "Removing one of two supported cards keeps the indicator visible.");
-        hand.Remove(second);
-        Assert(!state.IsVisible, "Removing the last supported card hides the indicator.");
-        Assert(visibilityChanges.SequenceEqual(new[] { true, false }), "Visibility changes only at the first and last qualifying card.");
-    }
-
-    private static void VerifyRebindingAndCombatEnd()
-    {
-        var firstHand = new FakeHand();
-        var nextHand = new FakeHand();
-        var state = CreateState(_ => { });
-        firstHand.Add("BASH");
-
-        state.Bind(firstHand);
-        Assert(state.IsVisible, "Initial binding scans existing cards.");
-        state.Bind(nextHand);
-        Assert(!state.IsVisible, "Rebinding refreshes state from the new hand.");
-        Assert(firstHand.AddedSubscriptions == 0 && firstHand.RemovedSubscriptions == 0, "Rebinding detaches the old hand.");
-        Assert(nextHand.AddedSubscriptions == 1 && nextHand.RemovedSubscriptions == 1, "Rebinding attaches one listener pair to the new hand.");
-
-        firstHand.Add("UPPERCUT");
-        Assert(!state.IsVisible, "The old hand no longer changes the indicator.");
-        nextHand.Add("COMET");
-        Assert(state.IsVisible, "The rebound hand drives the indicator.");
-        state.EndCombat();
-        Assert(!state.IsVisible, "Combat end hides the indicator.");
-        Assert(nextHand.AddedSubscriptions == 0 && nextHand.RemovedSubscriptions == 0, "Combat end removes both listeners.");
-        nextHand.Add("BASH");
-        Assert(!state.IsVisible, "Hand changes after combat end do not revive the indicator.");
-
-        state.Bind(nextHand);
-        Assert(state.IsVisible, "A later setup can bind the state again.");
-        Assert(nextHand.AddedSubscriptions == 1 && nextHand.RemovedSubscriptions == 1, "Rebinding after combat end installs one listener pair.");
-        state.Dispose();
-    }
-
-    private static void VerifyOwnerCleanup()
-    {
-        var hand = new FakeHand();
-        var state = CreateState(_ => { });
-        hand.Add("BASH");
-        state.Bind(hand);
-        Assert(state.IsVisible, "Owner cleanup begins with an active indicator.");
-
-        state.Dispose();
-        Assert(!state.IsVisible, "Owner cleanup hides the indicator.");
-        Assert(hand.AddedSubscriptions == 0 && hand.RemovedSubscriptions == 0, "Owner cleanup removes both listeners.");
-        hand.Add("UPPERCUT");
-        Assert(!state.IsVisible, "An exited owner cannot be revived by later hand events.");
-
-        var threw = false;
-        try
+        Assert(VulnerableCardPredicate.IsSupported("MAD_SCIENCE", "Sapping"), "A Mad Science copy with the Sapping rider applies Vulnerable on every play.");
+        foreach (var rider in new[] { "None", "Violence", "Choking", "Energized", "Wisdom", "Chaos", "Expertise", "Curious", "Improvement", null })
         {
-            state.Bind(hand);
-        }
-        catch (ObjectDisposedException)
-        {
-            threw = true;
+            Assert(!VulnerableCardPredicate.IsSupported("MAD_SCIENCE", rider), $"A Mad Science copy with the {rider ?? "no"} rider stays excluded.");
         }
 
-        Assert(threw, "A disposed owner cannot be rebound.");
+        Assert(!VulnerableCardPredicate.IsSupported("BASH_LIKE", "Sapping"), "The Sapping rider counts only on Mad Science.");
+        Assert(VulnerableCardPredicate.IsSupported("BASH", null) && VulnerableCardPredicate.IsSupported("BASH", "Sapping"), "Supported ids stay supported with or without a rider name.");
+        Assert(!VulnerableCardPredicate.IsSupported("MOLTEN_FIST", null) && !VulnerableCardPredicate.IsSupported("MISERY", null), "Molten Fist and Misery stay excluded.");
     }
 
-    private static void VerifyInterruptedTracking()
+    private static void VerifyIndicatorLevel()
     {
-        using var initial = CreateState(_ => { });
-        initial.Suspend();
-        Assert(!initial.IsVisible, "An interruption before any hand observation remains hidden.");
-
-        var interruptedHand = new FakeHand();
-        interruptedHand.Add("BASH");
-        var visibilityChanges = new List<bool>();
-        using var state = CreateState(visibilityChanges.Add);
-        state.Bind(interruptedHand);
-        Assert(state.IsVisible, "The interruption starts with an observed visible result.");
-
-        state.Suspend();
-        state.Suspend();
-        Assert(state.IsVisible, "Repeated suspension preserves the last visible result.");
-        Assert(interruptedHand.AddedSubscriptions == 0 && interruptedHand.RemovedSubscriptions == 0, "Suspension detaches the old hand listener pair.");
-        interruptedHand.Remove(interruptedHand.Cards[0]);
-        Assert(state.IsVisible && visibilityChanges.SequenceEqual(new[] { true }), "Old-hand events cannot change the result during suspension.");
-
-        var restoredHand = new FakeHand();
-        restoredHand.Add("VICIOUS");
-        state.Bind(restoredHand);
-        Assert(!state.IsVisible, "Resuming with a new ineligible hand refreshes a retained visible result to hidden.");
-        Assert(restoredHand.AddedSubscriptions == 1 && restoredHand.RemovedSubscriptions == 1, "Resume installs one listener pair.");
-        state.Suspend();
-        restoredHand.Add("BASH");
-        Assert(!state.IsVisible, "An observed hidden result survives old-hand events while suspended.");
-        Assert(restoredHand.AddedSubscriptions == 0 && restoredHand.RemovedSubscriptions == 0, "Hidden-state suspension detaches the hand listener pair.");
-        state.Bind(new FakeHandAdapter(restoredHand));
-        Assert(state.IsVisible, "Resuming rescans a hand that changed while the observed result was hidden.");
-        Assert(restoredHand.AddedSubscriptions == 1 && restoredHand.RemovedSubscriptions == 1, "Resume through a new adapter installs one listener pair.");
-        state.Bind(new FakeHandAdapter(restoredHand));
-        Assert(restoredHand.AddedSubscriptions == 1 && restoredHand.RemovedSubscriptions == 1, "Repeated resume does not duplicate listeners.");
-
-        restoredHand.Add("COMET");
-        Assert(state.IsVisible, "Normal tracking resumes with the new hand's current eligibility.");
-        state.Suspend();
-        state.Suspend();
-        restoredHand.Remove(restoredHand.Cards.Single(card => card.ModelId == "COMET"));
-        Assert(state.IsVisible, "Repeated suspension preserves the last visible result after old-hand changes.");
-
-        var emptyHand = new FakeHand();
-        state.Bind(emptyHand);
-        Assert(!state.IsVisible, "Resuming with a changed empty hand refreshes the result to hidden.");
-        emptyHand.Add("UPPERCUT");
-        Assert(state.IsVisible, "The restored hand resumes normal event tracking.");
-        state.Suspend();
-        state.EndCombat();
-        Assert(!state.IsVisible, "Combat end hides the indicator when tracking is interrupted.");
-        Assert(emptyHand.AddedSubscriptions == 0 && emptyHand.RemovedSubscriptions == 0, "Combat end leaves no hand listeners during interruption.");
-        emptyHand.Add("BASH");
-        Assert(!state.IsVisible, "Hand events after interrupted combat end cannot show the indicator.");
-
-        state.Bind(emptyHand);
-        emptyHand.Add("COMET");
-        Assert(state.IsVisible, "A later combat setup can resume after interrupted combat end.");
-        state.Suspend();
-        state.Dispose();
-        Assert(!state.IsVisible, "Owner disposal hides the indicator during interruption.");
-        Assert(emptyHand.AddedSubscriptions == 0 && emptyHand.RemovedSubscriptions == 0, "Owner disposal leaves no hand listeners during interruption.");
+        Assert(IndicatorRule.Level(true, true, true, true, true, true) == IndicatorLevel.Full, "A playable supported card in the Play phase gives the full icon.");
+        Assert(IndicatorRule.Level(true, true, true, true, true, false) == IndicatorLevel.Dimmed, "A supported card that cannot be played now gives the dimmed icon.");
+        Assert(IndicatorRule.Level(true, true, true, true, false, false) == IndicatorLevel.Off, "No supported card gives no icon.");
+        Assert(IndicatorRule.Level(true, true, true, false, true, true) == IndicatorLevel.Off, "Outside the Play phase, a kept card gives no icon.");
+        Assert(IndicatorRule.Level(true, false, true, true, true, true) == IndicatorLevel.Off, "A disconnected player gives no icon.");
+        Assert(IndicatorRule.Level(true, true, false, true, true, true) == IndicatorLevel.Off, "A dead player gives no icon.");
+        Assert(IndicatorRule.Level(false, true, true, true, true, true) == IndicatorLevel.Off,
+            "A combat that is ending gives no icon, though every phase is still Play then.");
     }
 
-    private static void VerifyLocalAndRemoteRows()
+    private static void VerifyCommitGate()
     {
-        var localHand = new FakeHand();
-        var remoteHand = new FakeHand();
-        var local = CreateState(_ => { });
-        var remote = CreateState(_ => { });
-        local.Bind(localHand);
-        remote.Bind(remoteHand);
+        Assert(IndicatorRule.CanCommit(ActionPhase.None), "With no action running, a new level shows.");
+        Assert(!IndicatorRule.CanCommit(ActionPhase.Running), "While an action runs, a new level waits.");
+        Assert(IndicatorRule.CanCommit(ActionPhase.WaitingForChoice), "While an action waits for a player's choice, a new level shows, so no icon freezes.");
+    }
 
-        localHand.Add("BASH");
-        remoteHand.Add("VICIOUS");
-        Assert(local.IsVisible && !remote.IsVisible, "The same state path independently evaluates the viewing and remote rows.");
-        remoteHand.Add("COMET");
-        Assert(local.IsVisible && remote.IsVisible, "Both rows can show their own indicator concurrently.");
-        localHand.Remove(localHand.Cards[0]);
-        Assert(!local.IsVisible && remote.IsVisible, "A hand change affects only its owning row.");
+    private static void VerifyRowTransitions()
+    {
+        var state = new RowIndicatorState();
+        Assert(state.Committed == IndicatorLevel.Off, "A row starts off.");
 
-        local.Dispose();
-        remote.Dispose();
+        var arrived = state.Observe(IndicatorLevel.Full, true);
+        Assert(arrived is { BecameFull: true, LeftFull: false }, "Off to full speaks.");
+        Assert(state.Observe(IndicatorLevel.Full, true) is null, "The same level again changes nothing.");
+
+        var spent = state.Observe(IndicatorLevel.Dimmed, true);
+        Assert(spent is { BecameFull: false, LeftFull: true }, "Full to dimmed takes the arrival bubble down.");
+        var regained = state.Observe(IndicatorLevel.Full, true);
+        Assert(regained is { BecameFull: true }, "Dimmed to full speaks again.");
+
+        Assert(state.Observe(IndicatorLevel.Dimmed, false) is null && state.Committed == IndicatorLevel.Full,
+            "During a running action the energy just spent does not show yet.");
+        Assert(state.Observe(IndicatorLevel.Full, true) is null && state.Committed == IndicatorLevel.Full,
+            "A spend-then-gain play ends full again with no change and no second bubble.");
+
+        var played = state.Observe(IndicatorLevel.Off, true);
+        Assert(played is { LeftFull: true, BecameFull: false }, "Full to off takes the arrival bubble down.");
+        var drawnBroke = state.Observe(IndicatorLevel.Dimmed, true);
+        Assert(drawnBroke is { BecameFull: false, LeftFull: false }, "Off to dimmed stays quiet.");
+        Assert(state.Observe(IndicatorLevel.Off, true) is { BecameFull: false, LeftFull: false }, "Dimmed to off stays quiet.");
+
+        state.Observe(IndicatorLevel.Full, true);
+        Assert(state.Reset() is { LeftFull: true } && state.Committed == IndicatorLevel.Off, "The end of a combat goes off at once.");
+        Assert(state.Reset() is null, "A second reset changes nothing.");
+    }
+
+    private static void VerifyPendingChange()
+    {
+        var state = new RowIndicatorState();
+        state.Observe(IndicatorLevel.Full, true);
+        Assert(!state.IsPending, "A committed level leaves nothing pending.");
+
+        Assert(state.Observe(IndicatorLevel.Dimmed, false) is null && state.IsPending,
+            "A change refused while an action runs stays pending, so it is checked again.");
+        Assert(state.Observe(IndicatorLevel.Dimmed, true) is { LeftFull: true } && !state.IsPending,
+            "When the action pauses for a player's choice, the pending change shows.");
+
+        state.Observe(IndicatorLevel.Full, false);
+        Assert(state.IsPending, "A gain during an action waits too.");
+        Assert(state.Observe(IndicatorLevel.Dimmed, false) is null && !state.IsPending,
+            "A refused level equal to the committed one leaves nothing pending.");
+        state.Observe(IndicatorLevel.Off, false);
+        Assert(state.Reset() is { From: IndicatorLevel.Dimmed, To: IndicatorLevel.Off } && !state.IsPending,
+            "The end of a combat goes off at once and clears a pending change.");
+    }
+
+    private static void VerifyReminderLevel()
+    {
+        Assert(ReminderLevel.IsFull(true, false, true, false), "For a reaction, a teammate is read from the game now.");
+        Assert(!ReminderLevel.IsFull(true, false, false, true), "For a reaction, a teammate who just lost the play reads as not full.");
+        Assert(ReminderLevel.IsFull(true, true, false, true),
+            "For a reaction, your own row keeps its state from before your Attack, so its cost does not hide the reminder.");
+        Assert(!ReminderLevel.IsFull(false, false, true, false) && ReminderLevel.IsFull(false, false, false, true),
+            "For the card cloud, every row reads its committed level, as its icon shows.");
+    }
+
+    private static void VerifyGameBubbleTiming()
+    {
+        Assert(Math.Abs(GameBubbleTiming.SpeechSeconds(0.5) - 2.4) < 1e-9,
+            "A short game speech bubble holds arrivals back past its 1.9 s on screen.");
+        Assert(Math.Abs(GameBubbleTiming.SpeechSeconds(4.0) - 4.4) < 1e-9, "A longer one holds them for its fade-in, hold, and fade-out.");
+        Assert(Math.Abs(GameBubbleTiming.ThoughtSeconds(1.5) - 2.5) < 1e-9, "A timed game thought holds them for its time and its fade.");
+        Assert(Math.Abs(GameBubbleTiming.ThoughtSeconds(0.2) - 2.0) < 1e-9, "A thought shorter than a second holds them as one of a second.");
+        Assert(GameBubbleTiming.ThoughtSeconds(null) == GameBubbleTiming.UntimedSeconds, "An untimed game thought holds them for a bounded time.");
+    }
+
+    private static void VerifyVulnerableNeed()
+    {
+        Assert(VulnerableNeed.Of(false, false), "An enemy without Vulnerable or Artifact needs Vulnerable.");
+        Assert(!VulnerableNeed.Of(true, false), "An enemy with Vulnerable does not.");
+        Assert(!VulnerableNeed.Of(false, true), "An enemy with Artifact does not, because the card would only take an Artifact stack.");
+
+        Assert(VulnerableNeed.AttackHitsNeedingEnemy(true, true, true), "An Attack at an enemy that needs Vulnerable counts.");
+        Assert(!VulnerableNeed.AttackHitsNeedingEnemy(true, false, true),
+            "An Attack at an enemy that has Vulnerable does not count, though another enemy needs it.");
+        Assert(VulnerableNeed.AttackHitsNeedingEnemy(false, false, true), "An Attack with no single enemy target counts when any enemy needs Vulnerable.");
+        Assert(!VulnerableNeed.AttackHitsNeedingEnemy(false, false, false), "An Attack with no single enemy target does not count when no enemy needs it.");
+    }
+
+    private static void VerifyReactionTurn()
+    {
+        var first = ReactionTurn.Of(3, new[] { 3, 3 });
+        Assert(ReactionTurn.Of(3, new[] { 3, 3 }) == first, "The same turn gives the same key.");
+        var extra = ReactionTurn.Of(3, new[] { 4, 3 });
+        Assert(extra != first, "An extra turn for one player gives a new key, though the round is the same.");
+        var next = ReactionTurn.Of(4, new[] { 5, 4 });
+        Assert(next != extra, "The next round gives a new key.");
+        Assert(ReactionTurn.Of(4, new[] { 5, 4 }) == next,
+            "Two players whose turn numbers differ since an extra turn share one key in the same turn, whoever attacks.");
+
+        var policy = new Policy();
+        var rows = new[] { Row("ally") };
+        Assert(policy.AttackPlayed(1, "me", false, true, rows).SequenceEqual(new[] { ("ally", 1) }), "The count starts in the first turn.");
+        Assert(policy.AttackPlayed(1, "other", false, true, rows).SequenceEqual(new[] { ("ally", 2) }), "Another attacker in the same turn raises the same count.");
+        Assert(policy.AttackPlayed(2, "me", false, true, rows).SequenceEqual(new[] { ("ally", 1) }), "A new turn key starts the count again.");
+    }
+
+    private static void VerifyArrivalQueue()
+    {
+        var queue = new ArrivalQueue<string>();
+        Assert(queue.Arrive("ally", false) && !queue.IsWaiting("ally"), "With no game bubble, the arrival shows at once.");
+        Assert(!queue.Arrive("ally", true) && queue.IsWaiting("ally"), "Over a game bubble, the arrival waits.");
+        Assert(queue.GameBubbleEnded("ally") && !queue.IsWaiting("ally"), "When the game bubble ends, the waiting arrival is due.");
+        Assert(!queue.GameBubbleEnded("ally"), "A game bubble ending with nothing waiting brings nothing.");
+
+        queue.Arrive("ally", true);
+        queue.Cancel("ally");
+        Assert(!queue.GameBubbleEnded("ally"), "An arrival whose row left full while it waited is dropped.");
+
+        queue.Arrive("a", true);
+        queue.Arrive("b", true);
+        queue.Clear();
+        Assert(!queue.IsWaiting("a") && !queue.IsWaiting("b"), "Clearing drops every waiting arrival.");
+
+        Assert(ArrivalQueue<string>.MayReact(false) && !ArrivalQueue<string>.MayReact(true), "A reaction due over a game bubble is dropped.");
     }
 
     private static void VerifySettingsParsing()
@@ -287,11 +280,15 @@ internal static class Program
         var shown = PlayerSettings.Default;
         var ownRowOff = shown with { ShowOnOwnRow = false };
 
-        Assert(!shown.ShowsIndicator(false, false) && !shown.ShowsIndicator(false, true), "No qualifying card shows nothing on any row.");
-        Assert(shown.ShowsIndicator(true, false) && shown.ShowsIndicator(true, true), "By default both your row and teammates' rows show the indicator.");
-        Assert(!ownRowOff.ShowsIndicator(true, true), "With the own row off, your own row shows nothing.");
-        Assert(ownRowOff.ShowsIndicator(true, false), "With the own row off, teammates' rows still show the indicator.");
-        Assert((shown with { ShowBubble = false }).ShowsIndicator(true, false), "With bubbles off, the row icon still shows.");
+        Assert(shown.ShownLevel(IndicatorLevel.Off, false) == IndicatorLevel.Off && shown.ShownLevel(IndicatorLevel.Off, true) == IndicatorLevel.Off,
+            "No qualifying card shows nothing on any row.");
+        Assert(shown.ShownLevel(IndicatorLevel.Full, false) == IndicatorLevel.Full && shown.ShownLevel(IndicatorLevel.Full, true) == IndicatorLevel.Full,
+            "By default both your row and teammates' rows show the indicator.");
+        Assert(shown.ShownLevel(IndicatorLevel.Dimmed, true) == IndicatorLevel.Dimmed, "The dimmed icon follows the same rule.");
+        Assert(ownRowOff.ShownLevel(IndicatorLevel.Full, true) == IndicatorLevel.Off && ownRowOff.ShownLevel(IndicatorLevel.Dimmed, true) == IndicatorLevel.Off,
+            "With the own row off, your own row shows nothing.");
+        Assert(ownRowOff.ShownLevel(IndicatorLevel.Full, false) == IndicatorLevel.Full, "With the own row off, teammates' rows still show the indicator.");
+        Assert((shown with { ShowBubble = false }).ShownLevel(IndicatorLevel.Full, false) == IndicatorLevel.Full, "With bubbles off, the row icon still shows.");
     }
 
     private static void VerifySettingsStore()
@@ -339,53 +336,47 @@ internal static class Program
         var own = Row("me", isOwnRow: true);
         var ally = Row("ally");
 
-        Assert(Policy.ShowsCloud(true, false, true, false, true, new[] { own, ally }), "In co-op a teammate holding a card brings the cloud.");
-        Assert(!Policy.ShowsCloud(true, false, true, false, true, new[] { own }), "In co-op your own row alone brings no cloud.");
-        Assert(Policy.ShowsCloud(true, false, true, true, true, new[] { own }), "In solo mode your own row brings the cloud.");
+        Assert(Policy.ShowsCloud(true, false, true, true, false, true, new[] { own, ally }), "In co-op a teammate with a full icon brings the cloud.");
+        Assert(!Policy.ShowsCloud(true, false, true, true, false, true, new[] { own }), "In co-op your own row alone brings no cloud.");
+        Assert(Policy.ShowsCloud(true, false, true, true, true, true, new[] { own }), "In solo mode your own row brings the cloud.");
 
         var notNeeded = new[]
         {
-            Row("empty", holdsCard: false),
-            Row("dead", isAlive: false),
-            Row("away", isConnected: false),
+            Row("dimmed or off", isFull: false),
             Row("done", isReadyToEndTurn: true)
         };
-        Assert(!Policy.ShowsCloud(true, false, true, true, true, notNeeded), "Rows without a card, dead, disconnected, or ready to end turn bring no cloud.");
-        Assert(Policy.ShowsCloud(true, false, true, false, true, notNeeded.Append(ally)), "One needed teammate among the others brings the cloud.");
-        Assert(!Policy.ShowsCloud(true, false, true, false, false, new[] { ally }), "No cloud shows when every enemy already has Vulnerable.");
-        Assert(!Policy.ShowsCloud(true, false, false, false, true, new[] { ally }), "No cloud shows while the local player cannot act.");
-        Assert(!Policy.ShowsCloud(false, false, true, false, true, new[] { ally }), "Hovering a card that is not an Attack shows no cloud.");
-        Assert(!Policy.ShowsCloud(true, true, true, false, true, new[] { ally }), "Hovering an Attack that applies Vulnerable itself shows no cloud.");
-        Assert(!Policy.ShowsCloud(true, false, true, false, true, new[] { Row("broke", canPlayCard: false) }),
-            "A teammate who cannot play their card now, for energy or anything else the game checks, brings no cloud.");
-        Assert(Policy.IsWorthAnnouncing(Row("broke", canPlayCard: false), true), "The card arriving is still announced over the teammate, as before.");
+        Assert(!Policy.ShowsCloud(true, false, true, true, true, true, notNeeded),
+            "Rows without a full icon (no card, cannot play it, dead, disconnected, outside Play) or ready to end turn bring no cloud.");
+        Assert(Policy.ShowsCloud(true, false, true, true, false, true, notNeeded.Append(ally)), "One needed teammate among the others brings the cloud.");
+        Assert(!Policy.ShowsCloud(true, false, true, true, false, false, new[] { ally }), "No cloud shows when no enemy needs Vulnerable.");
+        Assert(!Policy.ShowsCloud(true, false, true, false, false, true, new[] { ally }), "No cloud shows while the local player cannot act.");
+        Assert(!Policy.ShowsCloud(false, false, true, true, false, true, new[] { ally }), "Hovering a card that is not an Attack shows no cloud.");
+        Assert(!Policy.ShowsCloud(true, true, true, true, false, true, new[] { ally }), "Hovering an Attack that applies Vulnerable itself shows no cloud.");
+        Assert(!Policy.ShowsCloud(true, false, false, true, false, true, new[] { ally }), "Hovering an Attack you cannot play now shows no cloud.");
 
-        Assert(Policy.IsWorthAnnouncing(own, true) && !Policy.IsWorthAnnouncing(own, false),
-            "A bubble announces a card only while an enemy lacks Vulnerable.");
+        Assert(Policy.IsWorthAnnouncing(own, true) && !Policy.IsWorthAnnouncing(own, false), "A bubble announces a card only while an enemy needs Vulnerable.");
+        Assert(!Policy.IsWorthAnnouncing(Row("dimmed", isFull: false), true), "A dimmed or absent icon is never announced.");
         Assert(!Policy.IsWorthAnnouncing(Row("done", isReadyToEndTurn: true), true), "A bubble stays quiet for a player who ended the turn.");
     }
 
     private static void VerifyReactions()
     {
         var policy = new Policy();
-        var rows = new[] { Row("me", isOwnRow: true), Row("ally"), Row("other", holdsCard: false) };
+        var rows = new[] { Row("me", isOwnRow: true), Row("ally"), Row("other", isFull: false) };
 
         Assert(policy.AttackPlayed(1, "me", false, true, rows).SequenceEqual(new[] { ("ally", 1) }),
-            "Your Attack makes a teammate holding a card react, as the first Attack of the turn.");
+            "Your Attack makes a teammate with a full icon react, as the first Attack of the turn.");
         Assert(policy.AttackPlayed(1, "other", false, true, rows).SequenceEqual(new[] { ("ally", 2) }), "Another teammate's Attack counts too.");
         Assert(policy.AttackPlayed(1, "me", false, true, rows).SequenceEqual(new[] { ("ally", 3) }), "Each Attack in the turn raises the count.");
         Assert(policy.AttackPlayed(1, "ally", false, true, rows).Count == 0, "The holder's own Attack brings no reaction.");
-        Assert(policy.AttackPlayed(1, "me", false, false, rows).Count == 0, "Once every enemy has Vulnerable, nobody reacts.");
+        Assert(policy.AttackPlayed(1, "me", false, false, rows).Count == 0, "An Attack that hits no enemy needing Vulnerable brings no reaction.");
         Assert(policy.AttackPlayed(1, "me", false, true, rows).SequenceEqual(new[] { ("ally", 4) }), "An Attack nobody reacts to does not count.");
         Assert(policy.AttackPlayed(2, "me", false, true, rows).SequenceEqual(new[] { ("ally", 1) }), "A new turn starts the count again.");
 
         foreach (var (row, what) in new[]
         {
-            (Row("ally", holdsCard: false), "who has played the card"),
-            (Row("ally", isReadyToEndTurn: true), "who ended the turn"),
-            (Row("ally", isConnected: false), "who disconnected"),
-            (Row("ally", isAlive: false), "who died"),
-            (Row("ally", canPlayCard: false), "who cannot play their card now")
+            (Row("ally", isFull: false), "whose icon is dimmed or off"),
+            (Row("ally", isReadyToEndTurn: true), "who ended the turn")
         })
         {
             Assert(policy.AttackPlayed(2, "me", false, true, new[] { row }).Count == 0, $"A teammate {what} does not react.");
@@ -393,7 +384,7 @@ internal static class Program
 
         var two = new Policy();
         var holders = new[] { Row("a"), Row("b") };
-        Assert(two.AttackPlayed(1, "me", false, true, holders).SequenceEqual(new[] { ("a", 1), ("b", 1) }), "Every teammate holding a card reacts, in row order.");
+        Assert(two.AttackPlayed(1, "me", false, true, holders).SequenceEqual(new[] { ("a", 1), ("b", 1) }), "Every needed teammate reacts, in row order.");
         Assert(two.AttackPlayed(1, "a", false, true, holders).SequenceEqual(new[] { ("b", 2) }), "A holder's Attack makes the other holder react, and not itself.");
 
         Assert(new Policy().AttackPlayed(1, "ally", false, true, new[] { Row("me", isOwnRow: true) }).Count == 0, "In co-op your own row never reacts.");
@@ -543,21 +534,9 @@ internal static class Program
         Assert(CloudPlacement.IsSettled(26, 0.6), "After the longest wait the cloud shows even if the card has not settled.");
     }
 
-    private static HandReminderRow<string> Row(
-        string player,
-        bool isOwnRow = false,
-        bool holdsCard = true,
-        bool isAlive = true,
-        bool isConnected = true,
-        bool isReadyToEndTurn = false,
-        bool canPlayCard = true)
+    private static HandReminderRow<string> Row(string player, bool isOwnRow = false, bool isFull = true, bool isReadyToEndTurn = false)
     {
-        return new HandReminderRow<string>(player, isOwnRow, holdsCard, isAlive, isConnected, isReadyToEndTurn, canPlayCard);
-    }
-
-    private static HandIndicatorState<FakeCard> CreateState(Action<bool> setVisible)
-    {
-        return new HandIndicatorState<FakeCard>(card => card.ModelId, setVisible);
+        return new HandReminderRow<string>(player, isOwnRow, isFull, isReadyToEndTurn);
     }
 
     private static void Assert(bool condition, string message)
@@ -566,89 +545,6 @@ internal static class Program
         if (!condition)
         {
             throw new InvalidOperationException($"Regression failure: {message}");
-        }
-    }
-
-    private sealed record FakeCard(string ModelId);
-
-    private sealed class FakeHand : ICardHand<FakeCard>
-    {
-        private readonly List<FakeCard> _cards = new();
-        private Action<FakeCard>? _cardAdded;
-        private Action<FakeCard>? _cardRemoved;
-
-        public IReadOnlyList<FakeCard> Cards => _cards;
-        public int AddedSubscriptions { get; private set; }
-        public int RemovedSubscriptions { get; private set; }
-
-        public event Action<FakeCard> CardAdded
-        {
-            add
-            {
-                _cardAdded += value;
-                AddedSubscriptions++;
-            }
-            remove
-            {
-                _cardAdded -= value;
-                AddedSubscriptions--;
-            }
-        }
-
-        public event Action<FakeCard> CardRemoved
-        {
-            add
-            {
-                _cardRemoved += value;
-                RemovedSubscriptions++;
-            }
-            remove
-            {
-                _cardRemoved -= value;
-                RemovedSubscriptions--;
-            }
-        }
-
-        internal FakeCard Add(string modelId)
-        {
-            var card = new FakeCard(modelId);
-            _cards.Add(card);
-            _cardAdded?.Invoke(card);
-            return card;
-        }
-
-        internal void Remove(FakeCard card)
-        {
-            if (!_cards.Remove(card))
-            {
-                throw new InvalidOperationException("Cannot remove a card that is not in the hand.");
-            }
-
-            _cardRemoved?.Invoke(card);
-        }
-    }
-
-    private sealed class FakeHandAdapter : ICardHand<FakeCard>
-    {
-        private readonly FakeHand _hand;
-
-        internal FakeHandAdapter(FakeHand hand)
-        {
-            _hand = hand;
-        }
-
-        public IReadOnlyList<FakeCard> Cards => _hand.Cards;
-
-        public event Action<FakeCard> CardAdded
-        {
-            add => _hand.CardAdded += value;
-            remove => _hand.CardAdded -= value;
-        }
-
-        public event Action<FakeCard> CardRemoved
-        {
-            add => _hand.CardRemoved += value;
-            remove => _hand.CardRemoved -= value;
         }
     }
 }

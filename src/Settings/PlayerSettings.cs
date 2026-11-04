@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using WaitIHaveVuln.Indicator;
 
 namespace WaitIHaveVuln.Settings;
 
@@ -25,9 +26,9 @@ internal sealed record PlayerSettings(int IconScalePercent, bool ShowBubble, boo
     internal bool ShowsCardReminder => ShowBubble && ShowHandReminder;
 
     // With the own row off, the indicator stays off on that row, icon and bubble alike.
-    internal bool ShowsIndicator(bool handHasCard, bool isOwnRow)
+    internal IndicatorLevel ShownLevel(IndicatorLevel level, bool isOwnRow)
     {
-        return handHasCard && (ShowOnOwnRow || !isOwnRow);
+        return ShowOnOwnRow || !isOwnRow ? level : IndicatorLevel.Off;
     }
 
     internal PlayerSettings Normalize()

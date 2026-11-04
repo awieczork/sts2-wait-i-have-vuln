@@ -2,14 +2,12 @@ using System.Runtime.CompilerServices;
 using Godot;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Context;
-using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Actions;
 using MegaCrit.Sts2.Core.Entities.Players;
-using MegaCrit.Sts2.Core.Helpers;
+using MegaCrit.Sts2.Core.GameActions;
 using MegaCrit.Sts2.Core.Logging;
-using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
-using MegaCrit.Sts2.Core.Nodes.Vfx;
 using MegaCrit.Sts2.Core.Runs;
 using WaitIHaveVuln.Settings;
 
@@ -18,13 +16,21 @@ namespace WaitIHaveVuln.Indicator;
 internal static class MultiplayerPlayerStateIndicators
 {
     private static readonly ConditionalWeakTable<NMultiplayerPlayerState, RowIndicator> Indicators = new();
+    // Subscribed while any row is in a combat. The tracker belongs to the one CombatManager and the executor to
+    // the run, so each is kept to unsubscribe from the same instance.
+    private static CombatStateTracker? _tracker;
+    private static ActionExecutor? _executor;
+    // Set while a one-frame re-check is due for a row whose change waited for a running action.
+    private static SceneTree? _recheckTree;
 
     internal static void OnCombatSetUp(NMultiplayerPlayerState row, HBoxContainer topContainer, NHealthBar healthBar, TextureRect portrait)
     {
         Guard(nameof(OnCombatSetUp), () =>
         {
             var indicator = Indicators.GetValue(row, state => new RowIndicator(state, topContainer, healthBar, portrait));
-            indicator.BeginCombat(!IsConnected(row));
+            indicator.BeginCombat(IsConnected(row));
+            Subscribe();
+            indicator.Refresh(CanCommit());
         });
     }
 
@@ -34,7 +40,8 @@ internal static class MultiplayerPlayerStateIndicators
         {
             if (Indicators.TryGetValue(row, out var indicator))
             {
-                indicator.UpdateConnectionState(!IsConnected(row));
+                indicator.UpdateConnectionState(IsConnected(row));
+                indicator.Refresh(CanCommit());
             }
         });
     }
@@ -47,6 +54,8 @@ internal static class MultiplayerPlayerStateIndicators
             {
                 indicator.EndCombat();
             }
+
+            UnsubscribeWhenIdle();
         });
     }
 
@@ -54,19 +63,23 @@ internal static class MultiplayerPlayerStateIndicators
     {
         Guard(nameof(OnExitTree), () =>
         {
-            if (!Indicators.TryGetValue(row, out var indicator))
+            if (Indicators.TryGetValue(row, out var indicator))
             {
-                return;
+                indicator.Dispose();
+                Indicators.Remove(row);
             }
 
-            indicator.Dispose();
-            Indicators.Remove(row);
+            UnsubscribeWhenIdle();
         });
     }
 
-    // The rows in their on-screen order, from the hand state rather than the icon, so the icon
-    // options do not change who gets a hand reminder.
-    internal static List<HandReminderRow<Player>> ReminderRows()
+    /// <summary>
+    /// The rows in their on-screen order, from the indicator state rather than the icon, so the icon
+    /// options do not change who gets a reminder. With <paramref name="live"/>, teammates' rows are read
+    /// from the game now, as for a reaction while an Attack is being played; the own row is always the
+    /// committed level, which during that play is the state from before it (solo mode).
+    /// </summary>
+    internal static List<HandReminderRow<Player>> ReminderRows(bool live)
     {
         var combat = CombatManager.Instance;
         var rows = new List<(int Index, HandReminderRow<Player> Row)>();
@@ -78,24 +91,138 @@ internal static class MultiplayerPlayerStateIndicators
             }
 
             var player = row.Player;
-            rows.Add((row.GetIndex(), new HandReminderRow<Player>(
-                player,
-                LocalContext.IsMe(player),
-                indicator.HoldsCard,
-                player.Creature is { IsAlive: true },
-                indicator.IsConnected,
-                combat.IsPlayerReadyToEndTurn(player),
-                indicator.HoldsCard && CanPlaySupportedCard(player))));
+            var isMe = LocalContext.IsMe(player);
+            var isFull = ReminderLevel.IsFull(live, isMe, live && !isMe && indicator.LiveLevel() == IndicatorLevel.Full, indicator.IsFull);
+            rows.Add((row.GetIndex(), new HandReminderRow<Player>(player, isMe, isFull, combat.IsPlayerReadyToEndTurn(player))));
         }
 
         return rows.OrderBy(entry => entry.Index).Select(entry => entry.Row).ToList();
     }
 
-    // The game's own play check (energy and star cost, the Unplayable keyword, powers and relics that
-    // block the play), only read: a teammate who cannot play their card now is not reminded.
-    private static bool CanPlaySupportedCard(Player player)
+    /// <summary>The game's bubble over <paramref name="player"/> ended while their arrival bubble waited: it shows now if the row is still full.</summary>
+    internal static void RetryArrival(Player player)
     {
-        return player.PlayerCombatState?.Hand.Cards.Any(card => VulnerableCardPredicate.IsSupported(card.Id.Entry) && card.CanPlay()) ?? false;
+        foreach (var (row, indicator) in Indicators)
+        {
+            if (GodotObject.IsInstanceValid(row) && ReferenceEquals(row.Player, player))
+            {
+                indicator.RetryArrival();
+                return;
+            }
+        }
+    }
+
+    private static void Subscribe()
+    {
+        if (_tracker is null)
+        {
+            _tracker = CombatManager.Instance.StateTracker;
+            _tracker.CombatStateChanged += OnCombatStateChanged;
+        }
+
+        if (_executor is null && RunManager.Instance.ActionExecutor is { } executor)
+        {
+            _executor = executor;
+            _executor.AfterActionExecuted += OnActionExecuted;
+        }
+    }
+
+    private static void UnsubscribeWhenIdle()
+    {
+        foreach (var (_, indicator) in Indicators)
+        {
+            if (indicator.InCombat)
+            {
+                return;
+            }
+        }
+
+        if (_tracker is not null)
+        {
+            _tracker.CombatStateChanged -= OnCombatStateChanged;
+            _tracker = null;
+        }
+
+        if (_executor is not null)
+        {
+            _executor.AfterActionExecuted -= OnActionExecuted;
+            _executor = null;
+        }
+
+        CancelRecheck();
+    }
+
+    // Merged by the game to at most one call per frame, a frame after the change; it covers energy,
+    // stars, turn phase, piles, card costs, powers, deaths, and the combat history.
+    private static void OnCombatStateChanged(CombatState _)
+    {
+        HookGuard.Run("Combat state change", "the row icons keep their state", RefreshAll);
+    }
+
+    // The settled point after an action, which a change part-way through it waited for.
+    private static void OnActionExecuted(GameAction _)
+    {
+        HookGuard.Run("Action executed", "the row icons keep their state", RefreshAll);
+    }
+
+    private static void RefreshAll()
+    {
+        var canCommit = CanCommit();
+        var pending = false;
+        foreach (var (row, indicator) in Indicators)
+        {
+            if (GodotObject.IsInstanceValid(row))
+            {
+                indicator.Refresh(canCommit);
+                pending |= indicator.IsPending;
+            }
+        }
+
+        if (pending)
+        {
+            ScheduleRecheck();
+        }
+    }
+
+    // A change that waited for a running action is checked again on the next frame, and each frame after
+    // while it still waits, because an action that pauses for a player's choice raises no event; the checks
+    // stop as soon as no row waits.
+    private static void ScheduleRecheck()
+    {
+        if (_recheckTree is null && Engine.GetMainLoop() is SceneTree tree)
+        {
+            tree.ProcessFrame += OnRecheckFrame;
+            _recheckTree = tree;
+        }
+    }
+
+    private static void CancelRecheck()
+    {
+        if (_recheckTree is not null && GodotObject.IsInstanceValid(_recheckTree))
+        {
+            _recheckTree.ProcessFrame -= OnRecheckFrame;
+        }
+
+        _recheckTree = null;
+    }
+
+    private static void OnRecheckFrame()
+    {
+        CancelRecheck();
+        HookGuard.Run("Pending row check", "the row icons keep their state", RefreshAll);
+    }
+
+    // An action paused for a player's choice stays the executor's running action until another one
+    // starts, so its state, not only whether one is set, tells whether one is running.
+    private static bool CanCommit()
+    {
+        var phase = RunManager.Instance.ActionExecutor?.CurrentlyRunningAction?.State switch
+        {
+            GameActionState.WaitingForExecution or GameActionState.Executing or GameActionState.ReadyToResumeExecuting => ActionPhase.Running,
+            GameActionState.GatheringPlayerChoice => ActionPhase.WaitingForChoice,
+            _ => ActionPhase.None
+        };
+        return IndicatorRule.CanCommit(phase);
     }
 
     private static void Guard(string hook, Action action)
@@ -115,44 +242,25 @@ internal static class MultiplayerPlayerStateIndicators
         return lobby.ConnectedPlayerIds.Contains(row.Player.NetId);
     }
 
-    private sealed class CardPileHand : ICardHand<CardModel>
-    {
-        private readonly CardPile _pile;
-
-        internal CardPileHand(CardPile pile)
-        {
-            _pile = pile;
-        }
-
-        public IReadOnlyList<CardModel> Cards => _pile.Cards;
-
-        public event Action<CardModel> CardAdded
-        {
-            add => _pile.CardAdded += value;
-            remove => _pile.CardAdded -= value;
-        }
-
-        public event Action<CardModel> CardRemoved
-        {
-            add => _pile.CardRemoved += value;
-            remove => _pile.CardRemoved -= value;
-        }
-    }
-
     private sealed class RowIndicator : IDisposable
     {
         private const float IconSize = 36f;
         private const float Gap = 12f;
         private const double SpeechSeconds = 4.0;
+        // The dimmed icon: darker and half transparent, a starting point for the owner's judgement in game.
+        private static readonly Color DimmedModulate = new(0.6f, 0.6f, 0.6f, 0.55f);
         private readonly NMultiplayerPlayerState _row;
         private readonly HBoxContainer _topContainer;
         private readonly Control? _hpBar;
         private readonly Control _portrait;
-        private readonly HandIndicatorState<CardModel> _state;
+        // The health bar and the portrait, kept in one array, because the placement reads them every frame.
+        private readonly Control?[] _layoutParts;
+        private readonly RowIndicatorState _state = new();
         private TextureRect? _icon;
         private SceneTree? _frameTree;
         private bool _combatActive;
         private bool _connected;
+        private bool _failed;
 
         internal RowIndicator(NMultiplayerPlayerState row, HBoxContainer topContainer, NHealthBar healthBar, TextureRect portrait)
         {
@@ -161,87 +269,145 @@ internal static class MultiplayerPlayerStateIndicators
             // The visible bar, not the whole health bar node, which also holds the block badge.
             _hpBar = healthBar.HpBarContainer;
             _portrait = portrait;
-            _state = new HandIndicatorState<CardModel>(card => card.Id.Entry, OnHandChanged);
+            _layoutParts = new Control?[] { _hpBar, portrait };
         }
 
-        internal bool HoldsCard => _combatActive && _state.IsVisible;
+        internal bool InCombat => _combatActive;
 
-        internal bool IsConnected => _combatActive && _connected;
+        internal bool IsFull => _combatActive && _state.Committed == IndicatorLevel.Full;
 
-        internal void BeginCombat(bool disconnected)
+        internal bool IsPending => _combatActive && !_failed && _state.IsPending;
+
+        internal void BeginCombat(bool connected)
         {
             _combatActive = true;
-            UpdateConnectionState(disconnected);
+            _connected = connected;
+            _failed = false;
         }
 
-        internal void UpdateConnectionState(bool disconnected)
+        internal void UpdateConnectionState(bool connected)
         {
-            if (!_combatActive)
-            {
-                return;
-            }
-
-            _connected = !disconnected;
-            if (disconnected)
-            {
-                _state.Suspend();
-                return;
-            }
-
-            var hand = _row.Player.PlayerCombatState?.Hand;
-            if (hand is null)
-            {
-                _state.Suspend();
-                return;
-            }
-
-            _state.Bind(new CardPileHand(hand));
+            _connected = connected;
         }
 
         internal void EndCombat()
         {
             _combatActive = false;
-            _state.EndCombat();
+            Apply(_state.Reset());
         }
 
         public void Dispose()
         {
             _combatActive = false;
-            _state.Dispose();
-            FollowLayout(false);
+            Apply(_state.Reset());
+            SetLook(IndicatorLevel.Off);
+        }
+
+        // Runs inside the game's state and action events, up to once a frame, so a failure must not reach
+        // them, and one that would repeat is logged once and stops this row's refreshes until the next combat.
+        internal void Refresh(bool canCommit)
+        {
+            if (!_combatActive || _failed)
+            {
+                return;
+            }
+
+            try
+            {
+                if (_row.Player.Creature is { IsDead: true })
+                {
+                    Bubbles.TakeDown(_row.Player);
+                }
+
+                Apply(_state.Observe(LiveLevel(), canCommit));
+            }
+            catch (Exception exception)
+            {
+                _failed = true;
+                Log.Warn($"[{ModEntry.ModId}] Row refresh failed; the row keeps its icon as it was until the next combat. {exception}");
+            }
+        }
+
+        /// <summary>The level the game state gives now; the game's play check runs only for a player who could act.</summary>
+        internal IndicatorLevel LiveLevel()
+        {
+            var combat = CombatManager.Instance;
+            var player = _row.Player;
+            var playerState = player.PlayerCombatState;
+            var combatLive = _combatActive && combat.IsInProgress && !combat.IsOverOrEnding;
+            var isAlive = player.Creature is { IsAlive: true };
+            var isInPlayPhase = playerState?.Phase == PlayerTurnPhase.Play;
+            if (!combatLive || !_connected || !isAlive || !isInPlayPhase || playerState is null)
+            {
+                return IndicatorLevel.Off;
+            }
+
+            var holds = false;
+            var canPlay = false;
+            foreach (var card in playerState.Hand.Cards)
+            {
+                if (!SupportedCards.IsSupported(card))
+                {
+                    continue;
+                }
+
+                holds = true;
+                if (card.CanPlay())
+                {
+                    canPlay = true;
+                    break;
+                }
+            }
+
+            return IndicatorRule.Level(combatLive, _connected, isAlive, isInPlayPhase, holds, canPlay);
+        }
+
+        internal void RetryArrival()
+        {
+            if (IsFull && SettingsService.Current is { ShowBubble: true } settings
+                && settings.ShownLevel(IndicatorLevel.Full, LocalContext.IsMe(_row.Player)) == IndicatorLevel.Full)
+            {
+                ShowSpeechBubble();
+            }
         }
 
         // The settings are read here and never change while rows exist, because the game
         // greys out Mod Settings during a run.
-        // Runs inside the game's card pile events, so a failure must not reach the draw or the discard.
-        private void OnHandChanged(bool hasCard)
+        private void Apply(IndicatorChange? change)
         {
-            HookGuard.Run("Hand change", "the row keeps its icon as it was", () =>
+            if (change is not { } committed)
             {
-                var settings = SettingsService.Current;
-                var visible = settings.ShowsIndicator(hasCard, LocalContext.IsMe(_row.Player));
-                if (SetVisible(visible) && settings.ShowBubble)
-                {
-                    ShowSpeechBubble();
-                }
-            });
+                return;
+            }
+
+            var settings = SettingsService.Current;
+            var shown = settings.ShownLevel(committed.To, LocalContext.IsMe(_row.Player));
+            SetLook(shown);
+            if (committed.LeftFull)
+            {
+                Bubbles.LeftFull(_row.Player);
+            }
+
+            if (committed.BecameFull && shown == IndicatorLevel.Full && settings.ShowBubble)
+            {
+                ShowSpeechBubble();
+            }
         }
 
-        // Returns true when the icon was just created.
-        private bool SetVisible(bool visible)
+        private void SetLook(IndicatorLevel shown)
         {
-            if (visible)
+            if (shown == IndicatorLevel.Off)
             {
-                if (_icon is not null)
-                {
-                    return false;
-                }
+                RemoveIcon();
+                return;
+            }
 
-                // The icon is the primary signal; without it the bubble would announce nothing.
-                var texture = VulnerableIcon.Texture;
-                if (texture is null)
+            if (_icon is null || !GodotObject.IsInstanceValid(_icon))
+            {
+                // The icon is the primary signal; without its texture the row shows nothing.
+                if (VulnerableIcon.Texture is not { } texture)
                 {
-                    return false;
+                    return;
                 }
 
                 // ExpandMode comes before any size: under the default KeepSize, Godot clamps Size up to
@@ -260,12 +426,16 @@ internal static class MultiplayerPlayerStateIndicators
                 _icon = icon;
                 UpdateIconPosition();
                 FollowLayout(true);
-                return true;
             }
 
+            _icon.Modulate = shown == IndicatorLevel.Dimmed ? DimmedModulate : Colors.White;
+        }
+
+        private void RemoveIcon()
+        {
             if (_icon is null)
             {
-                return false;
+                return;
             }
 
             FollowLayout(false);
@@ -276,10 +446,9 @@ internal static class MultiplayerPlayerStateIndicators
             }
 
             _icon = null;
-            return false;
         }
 
-        // Only while the card can still help: its player could play it and an enemy lacks Vulnerable.
+        // Only while the card can still help: its player has not ended the turn and an enemy needs Vulnerable.
         private void ShowSpeechBubble()
         {
             var player = _row.Player;
@@ -290,13 +459,13 @@ internal static class MultiplayerPlayerStateIndicators
             }
 
             var combat = creature.CombatState;
-            var row = new HandReminderRow<Player>(player, LocalContext.IsMe(player), true, true, _connected, CombatManager.Instance.IsPlayerReadyToEndTurn(player));
+            var row = new HandReminderRow<Player>(player, LocalContext.IsMe(player), true, CombatManager.Instance.IsPlayerReadyToEndTurn(player));
             if (!HandReminderPolicy<Player, int>.IsWorthAnnouncing(row, Bubbles.EnemyNeedsVulnerable(combat)))
             {
                 return;
             }
 
-            Bubbles.Say(player, () => Bubbles.NextRow(combat, player), SpeechSeconds);
+            Bubbles.Arrive(player, () => Bubbles.NextRow(combat, player), SpeechSeconds);
         }
 
         // Powers tween in and the name label resizes its font without a layout signal on the row,
@@ -353,7 +522,7 @@ internal static class MultiplayerPlayerStateIndicators
             var right = ContentRight(_topContainer) ?? topRect.End.X;
             var top = topRect.Position.Y;
             var bottom = topRect.End.Y;
-            foreach (var part in new[] { _hpBar, _portrait })
+            foreach (var part in _layoutParts)
             {
                 if (part is null || !GodotObject.IsInstanceValid(part) || !part.IsVisibleInTree())
                 {

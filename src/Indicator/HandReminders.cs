@@ -4,12 +4,15 @@ using System.Runtime.CompilerServices;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
+using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
 using MegaCrit.Sts2.Core.Nodes.Vfx;
 using MegaCrit.Sts2.Core.Nodes.Vfx.Utilities;
 using MegaCrit.Sts2.Core.Runs;
@@ -26,12 +29,10 @@ namespace WaitIHaveVuln.Indicator;
 /// </summary>
 internal static class HandReminders
 {
-    // A few checks a second take down the clouds of teammates who are no longer needed.
+    // A few checks a second bring the cloud and take it down as teammates become needed or not.
     private const double TickSeconds = 0.2;
     // The gap kept around each cloud, as a share of the viewport height.
     private const float GapRatio = 0.01f;
-    // The clouds go with the hover; this only bounds one that is never taken down.
-    private const double CloudSeconds = 600;
     private const double ReactionSeconds = 2.5;
     // How many frames the unseen cloud may take to reach a size that holds.
     private const int MeasureFrames = 10;
@@ -40,11 +41,14 @@ internal static class HandReminders
     {
         None,
         Settling,
-        Measuring,
-        Shown
+        Shown,
+        // Hovered, with no cloud while no teammate is needed.
+        Watching
     }
 
     private static readonly ConditionalWeakTable<NPlayerHand, Reminder> Reminders = new();
+    // The measured box of each cloud side, with the screen size it was measured at; the cloud never changes size otherwise.
+    private static (Rect2 Left, Rect2 Right, Vector2 Viewport)? _knownBoxes;
     private static Func<NPlayerHand, bool>? _areCardActionsAllowed;
     private static bool _gateResolved;
     private static FieldInfo? _activeTipsField;
@@ -62,8 +66,9 @@ internal static class HandReminders
                 return;
             }
 
-            if (HandReminderPolicy<Player, int>.ShowsCloud(card.Type == CardType.Attack, VulnerableCardPredicate.IsSupported(card.Id.Entry),
-                CanAct(hand) && !CombatOver(combatState), OwnRowEligible(), Bubbles.EnemyNeedsVulnerable(combatState), MultiplayerPlayerStateIndicators.ReminderRows()))
+            // Every hovered Attack that does not apply Vulnerable is watched while it stays hovered, so the
+            // cloud comes and goes as teammates become needed or not; the rest of the rule is checked there.
+            if (card.Type == CardType.Attack && !SupportedCards.IsSupported(card))
             {
                 reminder.Pend(holder, combatState);
             }
@@ -81,7 +86,7 @@ internal static class HandReminders
         });
     }
 
-    internal static void OnAttackPlayed(Player attacker, ICombatState? combat)
+    internal static void OnAttackPlayed(Player attacker, ICombatState? combat, Creature? target)
     {
         HookGuard.Run(nameof(OnAttackPlayed), "no teammate reacts to the Attack", () =>
         {
@@ -90,11 +95,16 @@ internal static class HandReminders
                 return;
             }
 
+            // CardPlay.Target is set only for one-enemy and one-ally cards; an ally target is a player, not an enemy.
+            var targetsOneEnemy = target is { IsEnemy: true };
+            var hitsNeedingEnemy = VulnerableNeed.AttackHitsNeedingEnemy(targetsOneEnemy, targetsOneEnemy && Bubbles.NeedsVulnerable(target!),
+                Bubbles.EnemyNeedsVulnerable(combat));
+            var turn = ReactionTurn.Of(combat.RoundNumber, combat.Players.Select(player => player.PlayerCombatState?.TurnNumber ?? 0));
             var reminder = Reminders.GetValue(hand, _ => new Reminder(hand));
-            foreach (var (player, count) in reminder.Reactions.AttackPlayed((combat, combat.RoundNumber), attacker, OwnRowEligible(),
-                Bubbles.EnemyNeedsVulnerable(combat), MultiplayerPlayerStateIndicators.ReminderRows()))
+            foreach (var (player, count) in reminder.Reactions.AttackPlayed((combat, turn), attacker, OwnRowEligible(), hitsNeedingEnemy,
+                MultiplayerPlayerStateIndicators.ReminderRows(live: true)))
             {
-                if (Bubbles.Say(player, () => Bubbles.NextAngry(combat, player, attacker, count), ReactionSeconds) is not null)
+                if (Bubbles.React(player, () => Bubbles.NextAngry(combat, player, attacker, count), ReactionSeconds) is not null)
                 {
                     Log.Info($"[{ModEntry.ModId}] Reaction: tier {BubbleVoice.AngryTier(count) + 1}, Attack {count} this turn.");
                 }
@@ -106,12 +116,25 @@ internal static class HandReminders
     // nothing at all, as its icon and row bubble do.
     private static bool OwnRowEligible() => SoloMode.Enabled && RunManager.Instance.RunLobby is null && SettingsService.Current.ShowOnOwnRow;
 
-    // A won combat empties the enemies and discards the hand.
-    private static bool CombatOver(CombatState combat) => !CombatManager.Instance.IsInProgress || combat.HittableEnemies.Count == 0;
+    // A won combat empties the enemies and discards the hand; IsInProgress stays true until the win is checked.
+    private static bool CombatOver(CombatState combat)
+    {
+        var manager = CombatManager.Instance;
+        return !manager.IsInProgress || manager.IsOverOrEnding || combat.HittableEnemies.Count == 0;
+    }
+
+    // The game's own check for playing a card from the hand (NPlayerHand.CanPlayCards, private: no card play in
+    // progress and card actions allowed), no open overlay, and the local player's own Play phase, which
+    // starts after the turn-start draw.
+    private static bool CanAct(NPlayerHand hand, CombatState combat)
+    {
+        return !hand.InCardPlay && CardActionsAllowed(hand) && (NOverlayStack.Instance?.ScreenCount ?? 0) == 0
+            && LocalContext.GetMe(combat)?.PlayerCombatState?.Phase == PlayerTurnPhase.Play;
+    }
 
     // The game's own gate for card actions (private), resolved once; when a game update renames
     // it, the card reminder stays off with one warning.
-    private static bool CanAct(NPlayerHand hand)
+    private static bool CardActionsAllowed(NPlayerHand hand)
     {
         if (!_gateResolved)
         {
@@ -198,12 +221,17 @@ internal static class HandReminders
     {
         private readonly NPlayerHand _hand;
         private readonly Action _step;
+        // The shown cloud, and the two unseen ones measured while the hovered card settles.
         private Cloud? _cloud;
+        private Cloud? _tailLeft;
+        private Cloud? _tailRight;
+        private bool _prepared;
+        // Set while the shown cloud waits for the card to settle, to check its spot once.
+        private bool _checkAfterSettling;
         private NHandCardHolder? _holder;
         private CombatState? _combat;
         private Phase _phase;
         private CloudSpot? _spot;
-        private int _tipCount;
         private int _frames;
         private double _pendedAt;
         private double _nextTick;
@@ -222,21 +250,22 @@ internal static class HandReminders
             hand.TreeExiting += Clear;
         }
 
-        internal HandReminderPolicy<Player, (ICombatState, int)> Reactions { get; } = new();
+        internal HandReminderPolicy<Player, (ICombatState, ReactionTurn)> Reactions { get; } = new();
 
         internal void Pend(NHandCardHolder holder, CombatState combat)
         {
+            FreeClouds();
             _holder = holder;
             _combat = combat;
             _phase = Phase.Settling;
             _pendedAt = Bubbles.Now;
+            _prepared = false;
             Follow(true);
         }
 
         internal void Clear()
         {
-            _cloud?.Free();
-            _cloud = null;
+            FreeClouds();
             _phase = Phase.None;
             _spot = null;
             _holder = null;
@@ -268,28 +297,46 @@ internal static class HandReminders
             var now = Bubbles.Now;
             if (_phase == Phase.Settling)
             {
-                // Position and TargetPosition share the hand's units, so the offset is the slide still to come.
-                if (!CloudPlacement.IsSettled((_holder.Position - _holder.TargetPosition).Length(), now - _pendedAt))
+                // The rule is checked once, on the first frame of the hover, when the card's tips exist.
+                if (!_prepared)
                 {
-                    return;
+                    _prepared = true;
+                    if (!IsNeeded(combat))
+                    {
+                        _phase = Phase.Watching;
+                        _nextTick = now + TickSeconds;
+                        return;
+                    }
+
+                    PrepareClouds();
                 }
 
-                // Added unseen, because its size is known only once Godot has laid it out.
-                _cloud = _hand.GetParent() is { } parent ? Cloud.Create(parent, DialogueSide.Left) : null;
-                _phase = Phase.Measuring;
-                _frames = 0;
-                if (_cloud is null)
+                // The cloud's size never changes, so it is measured on the first hover only (or after the screen
+                // size changes) and shown at once from then on.
+                if (!CloudsKnown())
                 {
-                    Clear();
+                    if (!MeasureClouds() && _frames < MeasureFrames)
+                    {
+                        return;
+                    }
+
+                    KeepMeasuredBoxes();
                 }
 
+                Show(now);
                 return;
             }
 
-            if (_phase == Phase.Measuring)
+            if (_phase == Phase.Shown)
             {
-                Measure(now);
-                return;
+                // Like the game's own tips, the cloud follows the card: it keeps its spot beside where the card
+                // settles and moves with the slide still to come, so it never stands ahead of the card.
+                FollowCard();
+                if (_checkAfterSettling && CloudPlacement.IsSettled((_holder.Position - _holder.TargetPosition).Length(), now - _pendedAt))
+                {
+                    _checkAfterSettling = false;
+                    MoveToSettledCard();
+                }
             }
 
             if (now < _nextTick)
@@ -298,80 +345,202 @@ internal static class HandReminders
             }
 
             _nextTick = now + TickSeconds;
-            if (!HandReminderPolicy<Player, int>.ShowsCloud(true, false, CanAct(_hand) && !CombatOver(combat), OwnRowEligible(),
-                Bubbles.EnemyNeedsVulnerable(combat), MultiplayerPlayerStateIndicators.ReminderRows()))
+            var needed = IsNeeded(combat);
+            if (_phase == Phase.Shown && !needed)
             {
-                Clear();
+                // Hidden, not cleared: the hovered card stays watched and the cloud comes back when needed again.
+                FreeClouds();
+                _spot = null;
+                _phase = Phase.Watching;
+            }
+            else if (_phase == Phase.Watching && needed)
+            {
+                _phase = Phase.Settling;
+                _pendedAt = now;
+                _prepared = false;
             }
         }
 
-        // Measures the unseen cloud each frame until its size holds, then places and shows it. The cloud
-        // is added after the hand, so it draws over the resting cards.
-        private void Measure(double now)
+        // The whole rule at the hovered card now: the card must still be playable by the local player.
+        private bool IsNeeded(CombatState combat)
         {
-            if (_cloud is null || _holder is null || _hand.GetParent() is not { } parent)
+            return _holder?.CardNode?.Model is { } card
+                && HandReminderPolicy<Player, int>.ShowsCloud(true, false, card.CanPlay(), CanAct(_hand, combat) && !CombatOver(combat), OwnRowEligible(),
+                    Bubbles.EnemyNeedsVulnerable(combat), MultiplayerPlayerStateIndicators.ReminderRows(live: false));
+        }
+
+        // One cloud for each side the tail can point to, because a cloud left of the card has its tail on
+        // the right. Both are added after the hand, so the shown one draws over the resting cards.
+        private void PrepareClouds()
+        {
+            FreeClouds();
+            if (_hand.GetParent() is not { } parent)
             {
-                Clear();
                 return;
+            }
+
+            _tailLeft = Cloud.Create(parent, DialogueSide.Left);
+            _tailRight = Cloud.Create(parent, DialogueSide.Right);
+            _frames = 0;
+            if (_tailLeft is not null && _tailRight is not null && _knownBoxes is { } known && known.Viewport == _hand.GetViewportRect().Size)
+            {
+                _tailLeft.Box = known.Left;
+                _tailRight.Box = known.Right;
+            }
+        }
+
+        private bool CloudsKnown()
+        {
+            return _tailLeft is { Size: { X: > 0f, Y: > 0f } } && _tailRight is { Size: { X: > 0f, Y: > 0f } }
+                && _knownBoxes is { } known && known.Viewport == _hand.GetViewportRect().Size;
+        }
+
+        /// <summary>Measures both unseen clouds once; true when both sizes have held since the last frame.</summary>
+        private bool MeasureClouds()
+        {
+            if (_tailLeft is null || _tailRight is null)
+            {
+                return false;
             }
 
             _frames++;
-            if (!_cloud.Measure() && _frames < MeasureFrames)
-            {
-                return;
-            }
+            var left = _tailLeft.Measure();
+            var right = _tailRight.Measure();
+            return left && right;
+        }
 
-            if (_cloud.Size.X <= 0f || _cloud.Size.Y <= 0f)
+        private void KeepMeasuredBoxes()
+        {
+            if (_tailLeft is { Size: { X: > 0f, Y: > 0f } } left && _tailRight is { Size: { X: > 0f, Y: > 0f } } right)
             {
-                Log.Info($"[{ModEntry.ModId}] Card reminder: the cloud had no size after {_frames} frames; its parts: {_cloud.DescribeParts()}.");
+                _knownBoxes = (left.Box, right.Box, _hand.GetViewportRect().Size);
+            }
+        }
+
+        // Shows the cloud at the spot the hovered card slides to. The tips follow the card, so they move by
+        // the same slide; once the card has settled, the spot is checked once against where everything is.
+        private void Show(double now)
+        {
+            if (_tailLeft is null || _tailRight is null || _holder is null)
+            {
                 Clear();
                 return;
             }
 
-            if (_spot is null)
+            if (_tailLeft.Size.X <= 0f || _tailLeft.Size.Y <= 0f)
             {
-                var viewport = _hand.GetViewportRect();
-                var tips = TipBoxes();
-                if (CardBox(_holder) is not { } card
-                    || CloudPlacement.Place(ToBox(card), tips, ToBox(viewport), _cloud.Size.X, _cloud.Size.Y, viewport.Size.Y * GapRatio) is not { } spot)
-                {
-                    // The numbers the placement used, so a log shows which of them leaves no room.
-                    Log.Info($"[{ModEntry.ModId}] Card reminder: no free spot at the hovered card ({tips.Count} tip boxes); card {CardBox(_holder)}, "
-                        + $"cloud {_cloud.Size} from {_cloud.PartCount} parts, screen {viewport}, gap {viewport.Size.Y * GapRatio}.");
-                    Clear();
-                    return;
-                }
-
-                _spot = spot;
-                _tipCount = tips.Count;
-                // The tail points back at the card: a cloud left of the card opens to the left of its spot,
-                // so it is made again with that side and measured again.
-                if (spot.Side == CloudSide.Left)
-                {
-                    _cloud.Free();
-                    _cloud = Cloud.Create(parent, DialogueSide.Right);
-                    _frames = 0;
-                    if (_cloud is null)
-                    {
-                        Clear();
-                    }
-
-                    return;
-                }
+                Log.Info($"[{ModEntry.ModId}] Card reminder: the cloud had no size after {_frames} frames; its parts: {_tailLeft.DescribeParts()}.");
+                Clear();
+                return;
             }
 
-            var placed = _spot.Value;
-            _cloud.MoveTo(placed.Cloud);
+            var slide = SlideStillToCome(_holder);
+            if (PlaceAt(slide) is not { } placed)
+            {
+                Clear();
+                return;
+            }
+
+            var (spot, tipCount) = placed;
+            _spot = spot;
+            _cloud = spot.Side == CloudSide.Left ? _tailRight : _tailLeft;
+            FollowCard();
             _cloud.Reveal();
             _phase = Phase.Shown;
+            _checkAfterSettling = slide != Vector2.Zero;
             _nextTick = now + TickSeconds;
-            var where = placed.Side switch
+            Log.Info($"[{ModEntry.ModId}] Card reminder: cloud {Where(spot.Side)} the hovered card ({tipCount} tip boxes), {_cloud.Size} from {_cloud.PartCount} parts, after {_frames} frames.");
+        }
+
+        // The card has settled: the cloud moves only when the spot it should have now differs.
+        private void MoveToSettledCard()
+        {
+            if (_tailLeft is null || _tailRight is null || _spot is not { } shown || PlaceAt(Vector2.Zero) is not { } placed)
             {
-                CloudSide.Left => "left of",
-                CloudSide.Right => "right of",
-                _ => "above"
-            };
-            Log.Info($"[{ModEntry.ModId}] Card reminder: cloud {where} the hovered card ({_tipCount} tip boxes), {_cloud.Size} from {_cloud.PartCount} parts.");
+                return;
+            }
+
+            var spot = placed.Spot;
+            if (spot.Side == shown.Side && Mathf.Abs(spot.Cloud.X - shown.Cloud.X) < 2f && Mathf.Abs(spot.Cloud.Y - shown.Cloud.Y) < 2f)
+            {
+                return;
+            }
+
+            var next = spot.Side == CloudSide.Left ? _tailRight : _tailLeft;
+            if (!ReferenceEquals(next, _cloud))
+            {
+                _cloud?.Hide();
+            }
+
+            _spot = spot;
+            _cloud = next;
+            FollowCard();
+            _cloud.Reveal();
+            Log.Info($"[{ModEntry.ModId}] Card reminder: cloud moved {Where(spot.Side)} the settled card.");
+        }
+
+        // The card's box and its tips' boxes, moved by the slide still to come, placed with the cloud's size.
+        private (CloudSpot Spot, int TipCount)? PlaceAt(Vector2 slide)
+        {
+            if (_tailLeft is null || _holder is null || CardBox(_holder) is not { } card)
+            {
+                return null;
+            }
+
+            var viewport = _hand.GetViewportRect();
+            var tips = TipBoxes();
+            for (var i = 0; i < tips.Count; i++)
+            {
+                tips[i] = tips[i] with { X = tips[i].X + slide.X, Y = tips[i].Y + slide.Y };
+            }
+
+            var cardBox = ToBox(new Rect2(card.Position + slide, card.Size));
+            if (CloudPlacement.Place(cardBox, tips, ToBox(viewport), _tailLeft.Size.X, _tailLeft.Size.Y, viewport.Size.Y * GapRatio) is not { } spot)
+            {
+                // The numbers the placement used, so a log shows which of them leaves no room.
+                Log.Info($"[{ModEntry.ModId}] Card reminder: no free spot at the hovered card ({tips.Count} tip boxes); card {cardBox}, "
+                    + $"cloud {_tailLeft.Size} from {_tailLeft.PartCount} parts, screen {viewport}, gap {viewport.Size.Y * GapRatio}.");
+                return null;
+            }
+
+            return (spot, tips.Count);
+        }
+
+        // The spot is beside where the card settles; the cloud stands back by the slide still to come. Every
+        // frame while shown, with no allocation: Box and Vector2 are values.
+        private void FollowCard()
+        {
+            if (_cloud is null || _spot is not { } spot || _holder is null || !GodotObject.IsInstanceValid(_holder))
+            {
+                return;
+            }
+
+            var slide = SlideStillToCome(_holder);
+            _cloud.MoveTo(spot.Cloud with { X = spot.Cloud.X - slide.X, Y = spot.Cloud.Y - slide.Y });
+        }
+
+        // Position and TargetPosition share the hand's units; the parent's transform turns the offset into screen units.
+        private static Vector2 SlideStillToCome(NHandCardHolder holder)
+        {
+            var slide = holder.TargetPosition - holder.Position;
+            return holder.GetParent() is CanvasItem parent ? parent.GetGlobalTransform().BasisXform(slide) : slide;
+        }
+
+        private static string Where(CloudSide side) => side switch
+        {
+            CloudSide.Left => "left of",
+            CloudSide.Right => "right of",
+            _ => "above"
+        };
+
+        private void FreeClouds()
+        {
+            _tailLeft?.Free();
+            _tailRight?.Free();
+            _cloud = null;
+            _tailLeft = null;
+            _tailRight = null;
+            _checkAfterSettling = false;
         }
 
         private void Follow(bool follow)
@@ -416,11 +585,18 @@ internal static class HandReminders
 
         internal Vector2 Size => _box.Size;
 
+        /// <summary>The measured box, kept so a later cloud of the same side can show without measuring.</summary>
+        internal Rect2 Box
+        {
+            get => _box;
+            set => _box = value;
+        }
+
         internal int PartCount { get; private set; }
 
         internal static Cloud? Create(Node parent, DialogueSide side)
         {
-            if (VulnerableIcon.Texture is not { } icon || NThoughtBubbleVfx.Create(icon, side, CloudSeconds) is not { } bubble)
+            if (VulnerableIcon.Texture is not { } icon || NThoughtBubbleVfx.Create(icon, side, null) is not { } bubble)
             {
                 return null;
             }
@@ -469,6 +645,14 @@ internal static class HandReminders
             if (GodotObject.IsInstanceValid(_root))
             {
                 _root.Modulate = Colors.White;
+            }
+        }
+
+        internal void Hide()
+        {
+            if (GodotObject.IsInstanceValid(_root))
+            {
+                _root.Modulate = new Color(1f, 1f, 1f, 0f);
             }
         }
 

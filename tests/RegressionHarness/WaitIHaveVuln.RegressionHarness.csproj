@@ -11,8 +11,16 @@
   <!-- Links the engine-independent production sources; no game assemblies are needed. -->
   <ItemGroup>
     <Compile Include="../../src/Indicator/VulnerableCardPredicate.cs" Link="VulnerableCardPredicate.cs" />
-    <Compile Include="../../src/Indicator/ICardHand.cs" Link="ICardHand.cs" />
-    <Compile Include="../../src/Indicator/HandIndicatorState.cs" Link="HandIndicatorState.cs" />
+    <Compile Include="../../src/Indicator/IndicatorLevel.cs" Link="IndicatorLevel.cs" />
+    <Compile Include="../../src/Indicator/ActionPhase.cs" Link="ActionPhase.cs" />
+    <Compile Include="../../src/Indicator/IndicatorRule.cs" Link="IndicatorRule.cs" />
+    <Compile Include="../../src/Indicator/IndicatorChange.cs" Link="IndicatorChange.cs" />
+    <Compile Include="../../src/Indicator/RowIndicatorState.cs" Link="RowIndicatorState.cs" />
+    <Compile Include="../../src/Indicator/VulnerableNeed.cs" Link="VulnerableNeed.cs" />
+    <Compile Include="../../src/Indicator/ReactionTurn.cs" Link="ReactionTurn.cs" />
+    <Compile Include="../../src/Indicator/ArrivalQueue.cs" Link="ArrivalQueue.cs" />
+    <Compile Include="../../src/Indicator/GameBubbleTiming.cs" Link="GameBubbleTiming.cs" />
+    <Compile Include="../../src/Indicator/ReminderLevel.cs" Link="ReminderLevel.cs" />
     <Compile Include="../../src/Indicator/HandReminderRow.cs" Link="HandReminderRow.cs" />
     <Compile Include="../../src/Indicator/HandReminderPolicy.cs" Link="HandReminderPolicy.cs" />
     <Compile Include="../../src/Indicator/BubbleLine.cs" Link="BubbleLine.cs" />
