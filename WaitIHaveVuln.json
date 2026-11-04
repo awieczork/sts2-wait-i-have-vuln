@@ -3,7 +3,7 @@
     "name": "Wait! I Have Vuln!",
     "author": "Limonene",
     "description": "Co-op: shows a Vulnerable icon and a speech bubble when a player has a card that applies Vulnerable in hand. Client-side; does not affect gameplay.",
-    "version": "0.3.1",
+    "version": "0.3.2",
     "min_game_version": "0.107.1",
     "has_pck": false,
     "has_dll": true,
