@@ -15,13 +15,13 @@ It shows who holds a card that applies Vulnerable, so your team applies it befor
 
 During a co-op combat:
 
-- **Vulnerable icon.** The Vulnerable icon appears next to a player's name in the top-left player list while they hold a supported card. Your own row is included.
-- **"Wait! I have vuln!"** When a supported card lands in a player's hand, for example when they draw Bash, their character says so in a speech bubble for four seconds, in the character's colour. It shows only while an enemy still lacks Vulnerable and the player has not ended their turn. The first bubble of each combat is always "Wait! I have vuln!"; later ones vary, and some call you by name.
-- **Card reminder.** Hover an Attack while a teammate holds a supported card they can play right now, and a thought cloud with the Vulnerable icon appears beside your card. Attacks that apply Vulnerable themselves get no cloud.
+- **Vulnerable icon.** During your team's turn, the Vulnerable icon appears next to a player's name in the top-left player list while they hold a supported card. It is bright while they can play the card, and dimmed while they cannot, for example without the energy. Your own row is included.
+- **"Wait! I have vuln!"** When a player's icon turns bright, for example when they draw Bash or gain the energy to play it, their character says so in a speech bubble for four seconds. It shows only while an enemy still needs Vulnerable and the player has not ended their turn, and it goes away once they can no longer play the card. The first bubble of each combat is always "Wait! I have vuln!"; later ones vary, and some call you by name.
+- **Card reminder.** Hover an Attack you can play while a teammate's icon is bright, and a thought cloud with the Vulnerable icon appears beside your card and moves with it. Attacks that apply Vulnerable themselves get no cloud.
 
   ![A thought cloud with the Vulnerable icon beside a hovered Strike](docs/images/card-cloud.jpg)
 
-- **Teammates' reactions.** Play the Attack anyway, and each teammate still holding a supported card reacts over their character. They get angrier with each such Attack in the turn, from "Nooo!" to "I HAD VULN!" to "I'm writing this down."
+- **Teammates' reactions.** Play the Attack anyway at an enemy that still needs Vulnerable, and each teammate whose icon is bright reacts over their character. They get angrier with each such Attack in the turn, from "Nooo!" to "I HAD VULN!" to "I'm writing this down."
 
   ![A teammate's character reacting with an angry speech bubble after an Attack](docs/images/reaction.jpg)
 
@@ -46,17 +46,19 @@ Your choices are kept for the next game in `%APPDATA%\SlayTheSpire2\WaitIHaveVul
 - **Defect:** Beam Cell
 - **Necrobinder:** Fear, High Five, Putrefy
 - **Regent:** Comet, Falling Star, Gamma Blast, Know Thy Place, Meteor Shower
-- **Colorless and event cards:** Shockwave, Squash
+- **Colorless and event cards:** Shockwave, Squash, and Mad Science with the Sapping rider from the Tinker Time event
 
 ## Good to know
 
 - **Each player sees it on their own screen only.** Your teammates see your icon only if they have the mod too.
 - **Mixed groups work.** The mod is marked as not affecting gameplay, so the game lets you join a host whose mods differ and only notes it in the log.
-- **The icon means "in hand", not "playable".** It does not check energy. The card reminder and the reactions skip a teammate who cannot play the card right now, for example without the energy, but they cannot know about energy gained later in the turn.
-- **After a disconnect,** a player's icon keeps its last state until the mod can see their hand again.
+- **A dimmed icon still matters.** The player holds the card but cannot play it now, for example without the energy, so a teammate's energy card or potion can still make it count.
+- **An enemy with Artifact does not count as needing Vulnerable,** because the card would only remove an Artifact, so it brings no bubble, cloud, or reaction.
+- **A disconnected player's row shows no icon.**
+- **The game's own bubbles come first.** A "Wait! I have vuln!" waits while the game shows a bubble over that character, and a reaction then is skipped.
 - **The bubble text is always English.**
 - **Needs game version 0.107.1 or newer.**
-- **Not tested yet:** the card reminder and the reactions with real teammates (tested in solo mode only), hosting with the mod, reconnecting in the middle of a combat, using the settings with a controller, macOS, Linux, and Steam Deck.
+- **Not tested yet:** the icon, the card reminder, and the reactions with real teammates (tested in solo mode only), hosting with the mod, Mad Science with the Sapping rider, using the settings with a controller, macOS, Linux, and Steam Deck.
 - **Single-player looks the same as without the mod.** **Solo mode [dev]** in the settings is a testing aid: it shows your own row in single-player runs from the next run you start or continue, and it turns off when the game restarts.
 
 ## Install

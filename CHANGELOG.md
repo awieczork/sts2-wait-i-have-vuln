@@ -5,6 +5,26 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## Unreleased
 
+### Added
+
+- The Vulnerable icon is dimmed while its player holds a supported card they cannot play right now, for example without the energy, and bright while they can.
+- Mad Science copies with the Sapping rider from the Tinker Time event count as supported cards.
+
+### Changed
+
+- The Vulnerable icon shows only during the players' turn, so a card kept in hand shows no icon while the enemies act.
+- The "Wait! I have vuln!" bubble appears each time a player's icon turns bright, including when they gain the energy to play their card, and goes away once they can no longer play it.
+- A disconnected player's row shows no icon.
+- An enemy with Artifact does not count as needing Vulnerable for the bubbles, the card reminder, and the reactions.
+- Teammates react only to an Attack at an enemy that still needs Vulnerable.
+- The card reminder appears as soon as you hover an Attack you can play, and it moves with the card.
+- The mod's bubbles give way to the game's own bubbles over a character.
+
+### Fixed
+
+- The card reminder stays while you hover an Attack with the game's fast mode set to Instant.
+- The teammates' reactions count the Attacks of an extra turn apart from the turn before it.
+
 ## [0.3.0] - 2026-11-03
 
 ### Added
