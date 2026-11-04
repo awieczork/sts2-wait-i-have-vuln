@@ -354,9 +354,11 @@ internal static class Program
         Assert(!Policy.ShowsCloud(true, true, true, true, false, true, new[] { ally }), "Hovering an Attack that applies Vulnerable itself shows no cloud.");
         Assert(!Policy.ShowsCloud(true, false, false, true, false, true, new[] { ally }), "Hovering an Attack you cannot play now shows no cloud.");
 
-        Assert(Policy.IsWorthAnnouncing(own, true) && !Policy.IsWorthAnnouncing(own, false), "A bubble announces a card only while an enemy needs Vulnerable.");
-        Assert(!Policy.IsWorthAnnouncing(Row("dimmed", isFull: false), true), "A dimmed or absent icon is never announced.");
-        Assert(!Policy.IsWorthAnnouncing(Row("done", isReadyToEndTurn: true), true), "A bubble stays quiet for a player who ended the turn.");
+        Assert(Policy.IsWorthAnnouncing(ally, false, true) && !Policy.IsWorthAnnouncing(ally, false, false), "A bubble announces a card only while an enemy needs Vulnerable.");
+        Assert(!Policy.IsWorthAnnouncing(own, false, true), "In co-op no bubble announces your own card.");
+        Assert(Policy.IsWorthAnnouncing(own, true, true), "In solo mode a bubble announces your own card, which stands for a teammate's.");
+        Assert(!Policy.IsWorthAnnouncing(Row("dimmed", isFull: false), false, true), "A dimmed or absent icon is never announced.");
+        Assert(!Policy.IsWorthAnnouncing(Row("done", isReadyToEndTurn: true), false, true), "A bubble stays quiet for a player who ended the turn.");
     }
 
     private static void VerifyReactions()

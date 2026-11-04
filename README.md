@@ -19,7 +19,7 @@ During a co-op combat:
 
   ![The dimmed Vulnerable icon on a player's row while Bash is in hand with only 1 energy left](docs/images/dimmed-icon.jpg)
 
-- **"Wait! I have vuln!"** When a player's icon turns bright, for example when they draw Bash or gain the energy to play it, their character says so in a speech bubble for four seconds. It shows only while an enemy still needs Vulnerable and the player has not ended their turn, and it goes away once they can no longer play the card. The first bubble of each combat is always "Wait! I have vuln!"; later ones vary, and some call you by name.
+- **"Wait! I have vuln!"** When a teammate's icon turns bright, for example when they draw Bash or gain the energy to play it, their character says so in a speech bubble for four seconds. Your own character stays quiet, because you already know what is in your hand. It shows only while an enemy still needs Vulnerable and the player has not ended their turn, and it goes away once they can no longer play the card. The first bubble of each combat is always "Wait! I have vuln!"; later ones vary, and some call you by name.
 - **Card reminder.** Hover an Attack you can play while a teammate's icon is bright, and a thought cloud with the Vulnerable icon appears beside your card and moves with it. Attacks that apply Vulnerable themselves get no cloud.
 
   ![A thought cloud with the Vulnerable icon beside a hovered Strike](docs/images/card-cloud.jpg)

@@ -3,7 +3,9 @@ namespace WaitIHaveVuln.Indicator;
 /// <summary>
 /// Engine-independent rules for the bubble layer's reminders. A teammate is needed while their icon is
 /// full (<see cref="HandReminderRow{TPlayer}.IsFull"/>), they are not ready to end the turn, and an enemy
-/// still needs Vulnerable; in co-op the own row never counts, and in solo mode it stands for a teammate.
+/// still needs Vulnerable; in co-op the own row never counts, because the mod draws only on its own
+/// player's screen, so a bubble over you would only tell you what you hold (owner's decision of
+/// 2026-11-04), and in solo mode it stands for a teammate.
 /// Every hover of an Attack the local player can play and that does not apply Vulnerable shows one card
 /// cloud while a teammate is needed and the local player can act, and every such Attack another player
 /// plays at an enemy that needs Vulnerable makes each needed teammate react, angrier with each one in the turn.
@@ -15,10 +17,13 @@ internal sealed class HandReminderPolicy<TPlayer, TTurn>
     private TTurn? _turn;
     private bool _hasTurn;
 
-    /// <summary>Whether a bubble may announce this row's card: its icon is full, the player has not ended the turn, and an enemy needs Vulnerable.</summary>
-    internal static bool IsWorthAnnouncing(HandReminderRow<TPlayer> row, bool enemyNeedsVulnerable)
+    /// <summary>
+    /// Whether a bubble may announce this row's card: the row is a teammate's, or the own row in solo mode
+    /// (<paramref name="ownRowEligible"/>), its icon is full, the player has not ended the turn, and an enemy needs Vulnerable.
+    /// </summary>
+    internal static bool IsWorthAnnouncing(HandReminderRow<TPlayer> row, bool ownRowEligible, bool enemyNeedsVulnerable)
     {
-        return enemyNeedsVulnerable && row.IsFull && !row.IsReadyToEndTurn;
+        return (!row.IsOwnRow || ownRowEligible) && enemyNeedsVulnerable && row.IsFull && !row.IsReadyToEndTurn;
     }
 
     /// <summary>
@@ -35,7 +40,7 @@ internal sealed class HandReminderPolicy<TPlayer, TTurn>
         IEnumerable<HandReminderRow<TPlayer>> rows)
     {
         ArgumentNullException.ThrowIfNull(rows);
-        return isAttack && !isVulnerableCard && isPlayable && canAct && rows.Any(row => IsNeeded(row, ownRowEligible, enemyNeedsVulnerable));
+        return isAttack && !isVulnerableCard && isPlayable && canAct && rows.Any(row => IsWorthAnnouncing(row, ownRowEligible, enemyNeedsVulnerable));
     }
 
     /// <summary>
@@ -64,7 +69,7 @@ internal sealed class HandReminderPolicy<TPlayer, TTurn>
         foreach (var row in rows)
         {
             var isAttacker = EqualityComparer<TPlayer>.Default.Equals(row.Player, attacker);
-            if (!IsNeeded(row, ownRowEligible, hitsNeedingEnemy) || (isAttacker && !(row.IsOwnRow && ownRowEligible)))
+            if (!IsWorthAnnouncing(row, ownRowEligible, hitsNeedingEnemy) || (isAttacker && !(row.IsOwnRow && ownRowEligible)))
             {
                 continue;
             }
@@ -75,10 +80,5 @@ internal sealed class HandReminderPolicy<TPlayer, TTurn>
         }
 
         return reactions;
-    }
-
-    private static bool IsNeeded(HandReminderRow<TPlayer> row, bool ownRowEligible, bool enemyNeedsVulnerable)
-    {
-        return (!row.IsOwnRow || ownRowEligible) && IsWorthAnnouncing(row, enemyNeedsVulnerable);
     }
 }

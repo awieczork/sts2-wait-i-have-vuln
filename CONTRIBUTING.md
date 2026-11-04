@@ -65,7 +65,7 @@ That line confirms the patches were installed, not that the icon rendered.
 To check the icon, the bubbles, and the card cloud alone, open Settings > Mod Settings from the main menu, select the mod, turn on **Solo mode [dev]**, and then start or continue a single-player run.
 The game then creates your own co-op row and treats the missing lobby as connected; the log says `Solo mode [dev] on`.
 Solo mode is never saved, so it is off after every game restart, and a change applies from the next run you start or continue.
-Your own row then stands for a teammate: hovering an Attack shows the card cloud, and your own Attacks bring its reactions.
+Your own row then stands for a teammate: your character says "Wait! I have vuln!", which it never does in co-op, hovering an Attack shows the card cloud, and your own Attacks bring its reactions.
 With **Show icon on my own row** off, the solo row shows nothing, because it is your own row.
 It does not exercise remote hands, hosting, or reconnects.
 

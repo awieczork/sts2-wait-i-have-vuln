@@ -448,7 +448,8 @@ internal static class MultiplayerPlayerStateIndicators
             _icon = null;
         }
 
-        // Only while the card can still help: its player has not ended the turn and an enemy needs Vulnerable.
+        // Only while the card can still help a teammate: the row is a teammate's (your own only in solo mode),
+        // its player has not ended the turn, and an enemy needs Vulnerable.
         private void ShowSpeechBubble()
         {
             var player = _row.Player;
@@ -460,7 +461,7 @@ internal static class MultiplayerPlayerStateIndicators
 
             var combat = creature.CombatState;
             var row = new HandReminderRow<Player>(player, LocalContext.IsMe(player), true, CombatManager.Instance.IsPlayerReadyToEndTurn(player));
-            if (!HandReminderPolicy<Player, int>.IsWorthAnnouncing(row, Bubbles.EnemyNeedsVulnerable(combat)))
+            if (!HandReminderPolicy<Player, int>.IsWorthAnnouncing(row, HandReminders.OwnRowEligible(), Bubbles.EnemyNeedsVulnerable(combat)))
             {
                 return;
             }

@@ -113,8 +113,8 @@ internal static class HandReminders
     }
 
     // In solo mode your own row stands for a teammate; with "Show icon on my own row" off it shows
-    // nothing at all, as its icon and row bubble do.
-    private static bool OwnRowEligible() => SoloMode.Enabled && RunManager.Instance.RunLobby is null && SettingsService.Current.ShowOnOwnRow;
+    // nothing at all, as its icon does. In co-op your own row gets no bubble of any kind.
+    internal static bool OwnRowEligible() => SoloMode.Enabled && RunManager.Instance.RunLobby is null && SettingsService.Current.ShowOnOwnRow;
 
     // A won combat empties the enemies and discards the hand; IsInProgress stays true until the win is checked.
     private static bool CombatOver(CombatState combat)

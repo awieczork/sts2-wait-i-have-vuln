@@ -5,6 +5,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## Unreleased
 
+### Changed
+
+- The "Wait! I have vuln!" bubble appears only over your teammates' characters in co-op, and your own character stays quiet while you hold a supported card.
+
 ## [0.3.1] - 2026-11-04
 
 ### Added
