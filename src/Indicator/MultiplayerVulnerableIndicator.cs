@@ -367,7 +367,7 @@ internal static class MultiplayerPlayerStateIndicators
             if (IsFull && SettingsService.Current is { ShowBubble: true } settings
                 && settings.ShownLevel(IndicatorLevel.Full, LocalContext.IsMe(_row.Player)) == IndicatorLevel.Full)
             {
-                ShowSpeechBubble();
+                ShowSpeechBubble(afterGameBubble: true);
             }
         }
 
@@ -390,7 +390,7 @@ internal static class MultiplayerPlayerStateIndicators
 
             if (committed.BecameFull && shown == IndicatorLevel.Full && settings.ShowBubble)
             {
-                ShowSpeechBubble();
+                ShowSpeechBubble(afterGameBubble: false);
             }
         }
 
@@ -449,8 +449,9 @@ internal static class MultiplayerPlayerStateIndicators
         }
 
         // Only while the card can still help a teammate: the row is a teammate's (your own only in solo mode),
-        // its player has not ended the turn, and an enemy needs Vulnerable.
-        private void ShowSpeechBubble()
+        // its player has not ended the turn, and an enemy needs Vulnerable. Each outcome is logged, so a
+        // player's godot.log shows what the bubbles did, as it does for reactions.
+        private void ShowSpeechBubble(bool afterGameBubble)
         {
             var player = _row.Player;
             var creature = player.Creature;
@@ -460,13 +461,12 @@ internal static class MultiplayerPlayerStateIndicators
             }
 
             var combat = creature.CombatState;
-            var row = new HandReminderRow<Player>(player, LocalContext.IsMe(player), true, CombatManager.Instance.IsPlayerReadyToEndTurn(player));
-            if (!HandReminderPolicy<Player, int>.IsWorthAnnouncing(row, HandReminders.OwnRowEligible(), Bubbles.EnemyNeedsVulnerable(combat)))
-            {
-                return;
-            }
-
-            Bubbles.Arrive(player, () => Bubbles.NextRow(combat, player), SpeechSeconds);
+            var isMe = LocalContext.IsMe(player);
+            var row = new HandReminderRow<Player>(player, isMe, true, CombatManager.Instance.IsPlayerReadyToEndTurn(player));
+            var outcome = HandReminderPolicy<Player, int>.SkipReason(row, HandReminders.OwnRowEligible(), Bubbles.EnemyNeedsVulnerable(combat)) is { } reason
+                ? $"skipped, {reason}"
+                : Bubbles.Arrive(player, () => Bubbles.NextRow(combat, player), SpeechSeconds);
+            Log.Info($"[{ModEntry.ModId}] Arrival bubble{(afterGameBubble ? " after the game's bubble" : "")}: {outcome} ({(isMe ? "own" : "teammate")} row).");
         }
 
         // Powers tween in and the name label resizes its font without a layout signal on the row,

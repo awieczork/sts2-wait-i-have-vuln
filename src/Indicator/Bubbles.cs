@@ -63,13 +63,15 @@ internal static class Bubbles
         return Voice.NextAngry(SettingsService.Current.VariedBubbleLines, attackCount, IsOnScreen, YourName(combat, speaker), NameOf(speaker), NameOf(attacker));
     }
 
-    /// <summary>The arrival bubble: shows now, or waits while a game bubble shows over the player.</summary>
-    internal static void Arrive(Player speaker, Func<BubbleLine?> pick, double seconds)
+    /// <summary>The arrival bubble: shows now, or waits while a game bubble shows over the player. Returns what happened, for the log.</summary>
+    internal static string Arrive(Player speaker, Func<BubbleLine?> pick, double seconds)
     {
-        if (Arrivals.Arrive(speaker, IsGameBubbleShowing(speaker.Creature)))
+        if (!Arrivals.Arrive(speaker, IsGameBubbleShowing(speaker.Creature)))
         {
-            Say(speaker, pick, seconds, Kind.Arrival);
+            return "waiting for the game's bubble";
         }
+
+        return Say(speaker, pick, seconds, Kind.Arrival) is null ? "no line to show" : "shown";
     }
 
     /// <summary>A reaction line, dropped while a game bubble shows over the player. Returns the line shown, or null.</summary>

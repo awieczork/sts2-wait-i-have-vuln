@@ -23,7 +23,28 @@ internal sealed class HandReminderPolicy<TPlayer, TTurn>
     /// </summary>
     internal static bool IsWorthAnnouncing(HandReminderRow<TPlayer> row, bool ownRowEligible, bool enemyNeedsVulnerable)
     {
-        return (!row.IsOwnRow || ownRowEligible) && enemyNeedsVulnerable && row.IsFull && !row.IsReadyToEndTurn;
+        return SkipReason(row, ownRowEligible, enemyNeedsVulnerable) is null;
+    }
+
+    /// <summary>Why a bubble may not announce this row's card, for the log; null when it may (<see cref="IsWorthAnnouncing"/>).</summary>
+    internal static string? SkipReason(HandReminderRow<TPlayer> row, bool ownRowEligible, bool enemyNeedsVulnerable)
+    {
+        if (row.IsOwnRow && !ownRowEligible)
+        {
+            return "own row in co-op";
+        }
+
+        if (!row.IsFull)
+        {
+            return "icon not full";
+        }
+
+        if (row.IsReadyToEndTurn)
+        {
+            return "turn ended";
+        }
+
+        return enemyNeedsVulnerable ? null : "no enemy needs Vulnerable";
     }
 
     /// <summary>

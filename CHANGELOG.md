@@ -5,6 +5,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## Unreleased
 
+### Added
+
+- The log has a `[WaitIHaveVuln] Arrival bubble:` line for each "Wait! I have vuln!" bubble: shown, waiting for the game's bubble, or skipped with the reason.
+
 ## [0.3.2] - 2026-11-04
 
 ### Changed

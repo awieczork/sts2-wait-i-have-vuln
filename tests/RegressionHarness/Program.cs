@@ -359,6 +359,9 @@ internal static class Program
         Assert(Policy.IsWorthAnnouncing(own, true, true), "In solo mode a bubble announces your own card, which stands for a teammate's.");
         Assert(!Policy.IsWorthAnnouncing(Row("dimmed", isFull: false), false, true), "A dimmed or absent icon is never announced.");
         Assert(!Policy.IsWorthAnnouncing(Row("done", isReadyToEndTurn: true), false, true), "A bubble stays quiet for a player who ended the turn.");
+        Assert(Policy.SkipReason(own, false, true) == "own row in co-op" && Policy.SkipReason(ally, false, false) == "no enemy needs Vulnerable"
+            && Policy.SkipReason(Row("done", isReadyToEndTurn: true), false, true) == "turn ended" && Policy.SkipReason(ally, false, true) is null,
+            "The arrival log names why a bubble stayed quiet, and nothing when it may show.");
     }
 
     private static void VerifyReactions()
