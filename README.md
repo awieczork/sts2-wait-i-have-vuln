@@ -61,7 +61,7 @@ Your choices are kept for the next game in `%APPDATA%\SlayTheSpire2\WaitIHaveVul
 - **The game's own bubbles come first.** A "Wait! I have vuln!" waits while the game shows a bubble over that character, and a reaction then is skipped.
 - **The bubble text is always English.**
 - **Needs game version 0.107.1 or newer.**
-- **Not tested yet:** the icon, the card reminder, and the reactions with real teammates (tested in solo mode only), hosting with the mod, Mad Science with the Sapping rider, using the settings with a controller, macOS, Linux, and Steam Deck.
+- **Not tested yet:** Mad Science with the Sapping rider, using the settings with a controller, macOS, Linux, and Steam Deck.
 - **Single-player looks the same as without the mod.** **Solo mode [dev]** in the settings is a testing aid: it shows your own row in single-player runs from the next run you start or continue, and it turns off when the game restarts.
 
 ## Install

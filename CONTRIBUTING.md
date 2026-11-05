@@ -26,7 +26,7 @@ The workspace recommends the C# extension for VS Code, but any editor works.
 | `src/Settings/` | Settings panel (`SettingsPanel.cs`, with `GameSliderLook.cs` and `NodeSearch.cs` matching it to the game's controls), current settings (`SettingsService.cs`), solo mode (`SoloMode.cs`), and engine-independent logic (`PlayerSettings.cs`, `SettingsStore.cs`, `SettingsLoadOutcome.cs`). |
 | `src/Testing/` | Solo mode patches, which create your own co-op row in single-player runs while solo mode is on. |
 | `tests/RegressionHarness/` | Console harness that links the engine-independent sources and drives them with a fake hand and a temporary settings folder. |
-| `scripts/` | Player helpers that copy normal saves into the modded profile; described in `docs/modded-saves.md`. Not part of the mod. |
+| `scripts/` | Player helpers that copy normal saves into the modded profile, described in `docs/modded-saves.md`, and `launch-coop.ps1` for a local co-op test. Not part of the mod. |
 | `docs/` | Player guides linked from the README. |
 
 The project references `sts2.dll`, `GodotSharp.dll`, and `0Harmony.dll` from the game install as non-copy-local references.
@@ -67,19 +67,38 @@ The game then creates your own co-op row and treats the missing lobby as connect
 Solo mode is never saved, so it is off after every game restart, and a change applies from the next run you start or continue.
 Your own row then stands for a teammate: your character says "Wait! I have vuln!", which it never does in co-op, hovering an Attack shows the card cloud, and your own Attacks bring its reactions.
 With **Show icon on my own row** off, the solo row shows nothing, because it is your own row.
-It does not exercise remote hands, hosting, or reconnects.
+It does not exercise remote hands, hosting, or reconnects; local co-op below covers remote hands and hosting.
+
+### Local co-op
+
+To test with a real teammate row, run two copies of the game on one PC, one hosting and one joining over `127.0.0.1`.
+Close the game, then start the host from the repository root and wait for its co-op character select:
+
+```powershell
+pwsh -NoProfile -File .\scripts\launch-coop.ps1 -Role Host
+pwsh -NoProfile -File .\scripts\launch-coop.ps1 -Role Client
+```
+
+The second command starts a window titled "Slay The Spire 2 (Client)" that joins the lobby; pick characters and play in both windows.
+Both copies start outside Steam (`--force-steam off`), so the players are "Test Host" and "Test Client 1", and each has its own profile under `%APPDATA%\SlayTheSpire2\default\<id>`, apart from your Steam saves.
+`-NoMods` starts the client without mods, as a teammate who does not have the mod.
+
+- Each new test profile skips the mod on its first start, because the mods warning is hidden behind the co-op screen: back out to the main menu, accept the warning, quit, and start that copy again. The log then shows `Mod initialized.`.
+- The host does not notice when the client quits and refuses it when it returns with the same id, so quit and restart both copies.
+- The logs are `coop-host.log` and `coop-client.log` in `%APPDATA%\SlayTheSpire2\logs`, and each start overwrites its file.
+- Both windows open at 1920 × 1080; resize them, and each profile keeps its size.
 
 ### Test in the game
 
 - Keep only one copy of the mod installed. The game reads `<game>\mods` before Workshop items and loads only one mod per id, refusing the other copy with a duplicate-id error. Unsubscribe from the Workshop item before testing a deployed build, and delete `<game>\mods\WaitIHaveVuln` before testing the Workshop copy.
-- Start the game through Steam, from the library or with `steam.exe -applaunch 2868840`. Starting `SlayTheSpire2.exe` directly fails Steam initialization.
+- Start the game through Steam, from the library or with `steam.exe -applaunch 2868840`. Starting `SlayTheSpire2.exe` directly fails Steam initialization, unless you start it with `--force-steam off` as local co-op does.
 - Change the mod's settings from the main menu only; the game greys out Mod Settings during a run.
 - To repeat a combat check without making moves: Save and Quit, change the settings on the main menu, and Continue. Continuing a run saved in combat restarts that combat at turn 1 with the same hand, so the bubble shows again on every Continue.
 - A single-player run in progress has to be continued or abandoned before a new one can start; look for Continue on the main menu before planning a fresh run.
 - The game keeps five `godot*.log` files and renames the current one at each launch, so copy the log out before a test that restarts the game several times.
-- Filter the log on `[WaitIHaveVuln]`. `Asset not cached`, `Progress parse: ... Unknown card ID`, and the leaked RID and ObjectDB lines at exit come from the game. The mod logs `Mod initialized.`, `Settings slider: copied the game's slider look (...)`, `Solo mode [dev] on` or `off`, a `Card reminder:` line for each cloud with its side and the tip boxes it avoided, and a `Reaction:` line with the tier for each angry line. `Skipped <class>: ... not found` means a game update renamed a patched member and that feature is off.
+- Filter the log on `[WaitIHaveVuln]`. `Asset not cached`, `Progress parse: ... Unknown card ID`, and the leaked RID and ObjectDB lines at exit come from the game. The mod logs `Mod initialized.`, `Settings slider: copied the game's slider look (...)`, `Solo mode [dev] on` or `off`, an `Arrival bubble:` line for each "Wait! I have vuln!" bubble (shown, waiting for the game's bubble, or skipped with the reason, such as your own row in co-op), a `Card reminder:` line for each cloud with its side and the tip boxes it avoided, and a `Reaction:` line with the tier for each angry line. `Skipped <class>: ... not found` means a game update renamed a patched member and that feature is off.
 
-A successful compile and harness run are not runtime verification; co-op behaviour needs a real session.
+A successful compile and harness run are not runtime verification; co-op behaviour needs a real session, such as local co-op.
 
 ## Submit a change
 
