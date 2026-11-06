@@ -109,6 +109,7 @@ internal static class SettingsPanel
         private readonly HSlider _iconScale;
         private readonly Label _iconScaleValue;
         private readonly BaseButton _showHandReminder;
+        private readonly BaseButton _showHandPreview;
         private readonly BaseButton _soloMode;
 
         internal Controls(Style style, Node onScreen)
@@ -162,16 +163,21 @@ internal static class SettingsPanel
             _showHandReminder = CreateToggle("Card reminder");
             _showHandReminder.Toggled += on => Change(nameof(_showHandReminder), settings => settings with { ShowHandReminder = on });
 
+            _showHandPreview = CreateToggle("Teammate hand preview");
+            _showHandPreview.Toggled += on => Change(nameof(_showHandPreview), settings => settings with { ShowHandPreview = on });
+
             _soloMode = CreateToggle("Solo mode [dev]");
             _soloMode.Toggled += on => HookGuard.Run(nameof(_soloMode), "solo mode keeps its current state", () => SoloMode.Enabled = on);
             var soloHint = CreateLabel(SoloHint, style.TextColor with { A = 0.7f });
             soloHint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             soloHint.AddThemeFontSizeOverride("font_size", (int)(style.FontSize * 0.8f));
 
-            // The row icon, the bubbles on top of it, and the developer option, each under its heading.
+            // The row icon and the hand preview, the bubbles on top of the icon, and the developer option,
+            // each under its heading.
             Root.AddChild(CreateLabel("Player list", Gold));
             Root.AddChild(_showOnOwnRow);
             Root.AddChild(iconScaleRow);
+            Root.AddChild(_showHandPreview);
             Root.AddChild(CreateLabel("Bubbles", Gold));
             Root.AddChild(_showBubble);
             Root.AddChild(_showHandReminder);
@@ -227,6 +233,7 @@ internal static class SettingsPanel
             _iconScale.SetValueNoSignal(settings.IconScalePercent);
             ShowScale(settings.IconScalePercent);
             SetToggle(_showHandReminder, settings.ShowHandReminder);
+            SetToggle(_showHandPreview, settings.ShowHandPreview);
             SetToggle(_soloMode, SoloMode.Enabled);
         }
 

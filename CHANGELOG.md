@@ -7,6 +7,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
+- Hovering the card count on a teammate's row in the co-op player list shows their hand as small cards beside the list, in the order they hold them.
+- The Teammate hand preview option in Mod Settings turns the hand preview off.
+- The mod list describes the hand preview.
 - The log has a `[WaitIHaveVuln] Arrival bubble:` line for each "Wait! I have vuln!" bubble: shown, waiting for the game's bubble, or skipped with the reason.
 
 ## [0.3.2] - 2026-11-04

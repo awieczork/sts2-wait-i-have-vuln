@@ -413,8 +413,11 @@ internal static class MultiplayerPlayerStateIndicators
                 // ExpandMode comes before any size: under the default KeepSize, Godot clamps Size up to
                 // the texture's own size, and switching to IgnoreSize afterwards does not shrink it back.
                 var size = IconSize * SettingsService.Current.IconScale;
+                // Named with the mod id, as every node the mod adds to a row, so the hand preview can
+                // start after it.
                 var icon = new TextureRect
                 {
+                    Name = $"{ModEntry.ModId}VulnerableIcon",
                     ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                     StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                     Texture = texture,

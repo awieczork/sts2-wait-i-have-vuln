@@ -32,6 +32,10 @@
     <Compile Include="../../src/Indicator/CloudSide.cs" Link="CloudSide.cs" />
     <Compile Include="../../src/Indicator/CloudSpot.cs" Link="CloudSpot.cs" />
     <Compile Include="../../src/Indicator/CloudPlacement.cs" Link="CloudPlacement.cs" />
+    <Compile Include="../../src/HandPreview/HandPreviewRule.cs" Link="HandPreviewRule.cs" />
+    <Compile Include="../../src/HandPreview/HandStrip.cs" Link="HandStrip.cs" />
+    <Compile Include="../../src/HandPreview/HandStripLayout.cs" Link="HandStripLayout.cs" />
+    <Compile Include="../../src/HandPreview/ShownCards.cs" Link="ShownCards.cs" />
     <Compile Include="../../src/Settings/PlayerSettings.cs" Link="PlayerSettings.cs" />
     <Compile Include="../../src/Settings/SettingsLoadOutcome.cs" Link="SettingsLoadOutcome.cs" />
     <Compile Include="../../src/Settings/SettingsStore.cs" Link="SettingsStore.cs" />

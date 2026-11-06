@@ -2,6 +2,7 @@
 
 A Slay the Spire 2 co-op mod for the moment your teammate swings first while you are holding Bash.
 It shows who holds a card that applies Vulnerable, so your team applies it before the big hits.
+It also shows a teammate's hand when you hover their card count.
 
 ![The Vulnerable icon next to a player's name in the co-op player list, and a "Wait! I have vuln!" speech bubble over their character](docs/images/icon-and-bubble.jpg)
 
@@ -28,12 +29,15 @@ During a co-op combat:
 
   ![A teammate's character reacting with an angry speech bubble after an Attack](docs/images/reaction.jpg)
 
+- **Teammate's hand.** Hover the card count next to a teammate's name, and their hand appears as small cards to the right of the player list, in the order they hold them. It closes when the mouse leaves the card count, and it stays closed while you aim a card or a potion.
+
 ### Settings
 
 Set these on the main menu before you start or continue a run, under **Settings > Mod Settings > Wait! I Have Vuln!**; the game greys out Mod Settings during a run. Use the mouse, because the keyboard cannot reach these settings.
 
 - **Show icon on my own row:** off hides everything on your own row.
 - **Icon size:** 50% to 150%.
+- **Teammate hand preview:** off turns the hand preview off.
 - **Show bubbles:** off keeps only the icon, with no bubbles, cloud, or reactions.
 - **Card reminder:** off turns the thought cloud off.
 - **Varied bubble lines:** off keeps every bubble on one fixed line, "Wait! I have vuln!" or "Nooo!".
@@ -60,8 +64,9 @@ Your choices are kept for the next game in `%APPDATA%\SlayTheSpire2\WaitIHaveVul
 - **A disconnected player's row shows no icon.**
 - **The game's own bubbles come first.** A "Wait! I have vuln!" waits while the game shows a bubble over that character, and a reaction then is skipped.
 - **The bubble text is always English.**
+- **The hand preview needs the mouse.** It does not open while you play with a controller.
 - **Needs game version 0.107.1 or newer.**
-- **Not tested yet:** Mad Science with the Sapping rider, using the settings with a controller, macOS, Linux, and Steam Deck.
+- **Not tested yet:** Mad Science with the Sapping rider, the hand preview's numbers after a teammate's Strength, Weak, or cost changes, using the settings with a controller, macOS, Linux, and Steam Deck.
 - **Single-player looks the same as without the mod.** **Solo mode [dev]** in the settings is a testing aid: it shows your own row in single-player runs from the next run you start or continue, and it turns off when the game restarts.
 
 ## Install

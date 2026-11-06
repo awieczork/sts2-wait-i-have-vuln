@@ -21,8 +21,9 @@ The workspace recommends the C# extension for VS Code, but any editor works.
 | `Sts2PathDiscovery.props`, `Directory.Build.props.example` | Game path discovery and the optional local override template. |
 | `src/ModEntry.cs` | Initializer; loads the settings, installs the Harmony patches, and owns the `ModId` constant. |
 | `src/HookGuard.cs` | Wraps every Harmony entry point, so a mod error is logged as a warning and never reaches the game. |
-| `src/Patches/` | Thin Harmony postfixes on the co-op player row lifecycle, the local hand's hover and card pick-up, card plays, and the modding screen's mod details; `PatchTarget.cs` lets each patch class skip itself with one log line when the game renamed its target. |
+| `src/Patches/` | Thin Harmony postfixes on the co-op player row lifecycle (one patch class per feature), the local hand's hover and card pick-up, card plays, and the modding screen's mod details; `PatchTarget.cs` lets each patch class skip itself with one log line when the game renamed its target. |
 | `src/Indicator/` | Row icon and speech bubble (`MultiplayerVulnerableIndicator.cs`), the card reminder cloud and the teammates' reactions (`HandReminders.cs`, `Bubbles.cs`), and the engine-independent logic the harness links: the card set, hand state, reminder rules, bubble lines, and cloud placement. |
+| `src/HandPreview/` | Teammate hand preview on the row's card count (`RowHandPreview.cs`, `HandPreviews.cs`), and the engine-independent logic the harness links: when it opens, the strip layout, and the shown cards. |
 | `src/Settings/` | Settings panel (`SettingsPanel.cs`, with `GameSliderLook.cs` and `NodeSearch.cs` matching it to the game's controls), current settings (`SettingsService.cs`), solo mode (`SoloMode.cs`), and engine-independent logic (`PlayerSettings.cs`, `SettingsStore.cs`, `SettingsLoadOutcome.cs`). |
 | `src/Testing/` | Solo mode patches, which create your own co-op row in single-player runs while solo mode is on. |
 | `tests/RegressionHarness/` | Console harness that links the engine-independent sources and drives them with a fake hand and a temporary settings folder. |

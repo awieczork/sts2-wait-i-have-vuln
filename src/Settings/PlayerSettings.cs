@@ -9,7 +9,8 @@ namespace WaitIHaveVuln.Settings;
 /// what they see. Values from a file are read leniently: a missing or wrong-typed field takes its
 /// default, the icon scale is clamped and snapped to its step, and unknown fields are ignored.
 /// </summary>
-internal sealed record PlayerSettings(int IconScalePercent, bool ShowBubble, bool ShowOnOwnRow, bool ShowHandReminder, bool VariedBubbleLines)
+// ShowHandPreview has a default so that a file written before it existed reads with the preview on.
+internal sealed record PlayerSettings(int IconScalePercent, bool ShowBubble, bool ShowOnOwnRow, bool ShowHandReminder, bool VariedBubbleLines, bool ShowHandPreview = true)
 {
     internal const int MinScalePercent = 50;
     // 150% of the 36-unit icon is about the largest size checked clear of the relic bar above the row.
@@ -63,7 +64,8 @@ internal sealed record PlayerSettings(int IconScalePercent, bool ShowBubble, boo
                 ReadBool(root, "showBubble", Default.ShowBubble),
                 ReadBool(root, "showOnOwnRow", Default.ShowOnOwnRow),
                 ReadBool(root, "showHandReminder", Default.ShowHandReminder),
-                ReadBool(root, "variedBubbleLines", Default.VariedBubbleLines));
+                ReadBool(root, "variedBubbleLines", Default.VariedBubbleLines),
+                ReadBool(root, "showHandPreview", Default.ShowHandPreview));
             return true;
         }
     }
@@ -80,6 +82,7 @@ internal sealed record PlayerSettings(int IconScalePercent, bool ShowBubble, boo
             writer.WriteBoolean("showOnOwnRow", ShowOnOwnRow);
             writer.WriteBoolean("showHandReminder", ShowHandReminder);
             writer.WriteBoolean("variedBubbleLines", VariedBubbleLines);
+            writer.WriteBoolean("showHandPreview", ShowHandPreview);
             writer.WriteEndObject();
         }
 

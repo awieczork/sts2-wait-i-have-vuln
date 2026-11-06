@@ -1,3 +1,4 @@
+using WaitIHaveVuln.HandPreview;
 using WaitIHaveVuln.Indicator;
 using WaitIHaveVuln.Settings;
 
@@ -27,7 +28,11 @@ internal static class Program
         VerifyReactions,
         VerifyBubbleLines,
         VerifyBubbleVoice,
-        VerifyCloudPlacement
+        VerifyCloudPlacement,
+        VerifyHandPreviewRule,
+        VerifyHandStripLayout,
+        VerifyShownCards,
+        VerifyHandPreviewSetting
     };
 
     private static int _assertions;
@@ -538,6 +543,97 @@ internal static class Program
         Assert(!CloudPlacement.IsSettled(26, 0.15), "A card still sliding sideways to its spot has not settled.");
         Assert(CloudPlacement.IsSettled(26, 0.6), "After the longest wait the cloud shows even if the card has not settled.");
     }
+
+    private static void VerifyHandPreviewRule()
+    {
+        Assert(HandPreviewRule.IsOpen(true, true, false, true, false, false, false), "The mouse on a shown counter opens the preview.");
+        Assert(!HandPreviewRule.IsOpen(false, true, false, true, false, false, false), "With the setting off, the preview stays closed.");
+        Assert(!HandPreviewRule.IsOpen(true, false, false, true, false, false, false), "A hidden counter (own row, outside combat) gives no preview.");
+        Assert(!HandPreviewRule.IsOpen(true, true, true, true, false, false, false), "While a controller is in use, the preview stays closed.");
+        Assert(!HandPreviewRule.IsOpen(true, true, false, false, false, false, false), "The mouse off the counter closes the preview, even on the rest of the row.");
+        Assert(!HandPreviewRule.IsOpen(true, true, false, true, true, false, false), "During targeting, the preview stays closed.");
+        Assert(!HandPreviewRule.IsOpen(true, true, false, true, false, true, false), "During a card play, the preview stays closed.");
+        Assert(!HandPreviewRule.IsOpen(true, true, false, true, false, false, true), "While the game blocks hover tips, the preview stays closed.");
+    }
+
+    private static void VerifyHandStripLayout()
+    {
+        const float width = 300f;
+        const float height = 422f;
+        var canvas = new Box(16f, 16f, 1888f, 1048f);
+        const float left = 300f;
+        const float top = 94f;
+
+        var empty = HandStripLayout.Place(0, left, top, canvas, width, height);
+        Assert(Near(empty.Scale, HandStripLayout.BaseScale), "An empty hand keeps the base scale.");
+
+        var one = HandStripLayout.Place(1, left, top, canvas, width, height);
+        Assert(Near(one.Scale, HandStripLayout.BaseScale), "One card shows at the base scale.");
+        Assert(Near(one.CenterX(0) - width * one.Scale / 2f, left) && Near(one.CenterY - height * one.Scale / 2f, top),
+            "The first card's top-left corner is the strip's corner, because card centres are their origin.");
+
+        var five = HandStripLayout.Place(5, left, top, canvas, width, height);
+        Assert(Near(five.Step, width * five.Scale + HandStripLayout.Gap), "Cards that fit sit a gap apart.");
+
+        var full = HandStripLayout.Place(10, left, top, canvas, width, height);
+        Assert(Near(full.Scale, HandStripLayout.BaseScale), "A full hand of 10 fits beside the player list at the base scale.");
+        Assert(full.CenterX(9) + width * full.Scale / 2f <= canvas.Right + 0.01f, "The tenth card ends inside the canvas.");
+
+        var narrow = new Box(16f, 16f, 1384f, 1048f);
+        var shrunk = HandStripLayout.Place(10, left, top, narrow, width, height);
+        Assert(shrunk.Scale < HandStripLayout.BaseScale && shrunk.Scale > HandStripLayout.MinScale, "A hand too wide at the base scale shrinks to fit.");
+        Assert(Near(shrunk.Step, width * shrunk.Scale + HandStripLayout.Gap), "A shrunk strip keeps its gaps and does not overlap.");
+        Assert(shrunk.CenterX(9) + width * shrunk.Scale / 2f <= narrow.Right + 0.01f, "A shrunk or overlapping strip still ends inside the bounds.");
+
+        var tiny = new Box(16f, 16f, 600f, 1048f);
+        var overlapped = HandStripLayout.Place(10, left, top, tiny, width, height);
+        Assert(Near(overlapped.Scale, HandStripLayout.MinScale) && overlapped.Step < width * overlapped.Scale, "Past the minimum scale, the cards overlap.");
+        Assert(overlapped.CenterX(9) + width * overlapped.Scale / 2f <= tiny.Right + 0.01f, "An overlapping strip ends inside the bounds.");
+
+        var low = HandStripLayout.Place(3, left, 1000f, canvas, width, height);
+        Assert(Near(low.CenterY + height * low.Scale / 2f, canvas.Bottom), "A strip that would reach below the bounds moves up to end at their bottom.");
+        var flat = new Box(16f, 16f, 1888f, 100f);
+        var clipped = HandStripLayout.Place(3, left, top, flat, width, height);
+        Assert(Near(clipped.CenterY - height * clipped.Scale / 2f, flat.Y), "A strip taller than the bounds keeps its top at their top.");
+    }
+
+    private static void VerifyShownCards()
+    {
+        var shown = new ShownCards<string>(10);
+        var hand = new List<string> { "a", "b" };
+        Assert(!shown.Matches(hand), "Nothing shown does not match a hand with cards.");
+        Assert(shown.Matches(Array.Empty<string>()), "Nothing shown matches an empty hand.");
+
+        shown.Set(hand);
+        Assert(shown.Matches(hand) && shown.Count == 2 && shown[1] == "b", "A recorded hand matches itself.");
+        Assert(!shown.Matches(new List<string> { "b", "a" }), "A reordered hand does not match.");
+        Assert(!shown.Matches(new List<string> { "a", new string('b', 1) }), "An equal but different card does not match, because cards compare by reference.");
+        Assert(!shown.Matches(new List<string> { "a" }), "A smaller hand does not match.");
+
+        shown.Set(new List<string> { "c" });
+        Assert(shown.Count == 1 && shown[1] is null, "A smaller hand drops the entries past it.");
+
+        var over = Enumerable.Range(0, 12).Select(i => i.ToString()).ToList();
+        shown.Set(over);
+        Assert(shown.Count == 10, "More cards than the capacity record only the capacity.");
+
+        shown.Clear();
+        Assert(shown.Count == 0 && shown[0] is null, "Clear forgets every card.");
+    }
+
+    private static void VerifyHandPreviewSetting()
+    {
+        Assert(PlayerSettings.Default.ShowHandPreview, "The hand preview is on by default.");
+        Assert(PlayerSettings.TryParse("""{"showBubble":false}""", out var older) && older.ShowHandPreview,
+            "A file from before the preview reads with the preview on.");
+        Assert(PlayerSettings.TryParse("""{"showHandPreview":false}""", out var off) && !off.ShowHandPreview && off == PlayerSettings.Default with { ShowHandPreview = false },
+            "The preview can be turned off, and the other options keep their defaults.");
+        Assert(PlayerSettings.TryParse("""{"showHandPreview":"no"}""", out var wrong) && wrong.ShowHandPreview, "A wrong-typed preview field takes the default.");
+        var written = PlayerSettings.Default with { ShowHandPreview = false };
+        Assert(PlayerSettings.TryParse(written.ToJson(), out var roundTrip) && roundTrip == written, "The preview choice reads back unchanged.");
+    }
+
+    private static bool Near(float a, float b) => Math.Abs(a - b) < 0.01f;
 
     private static HandReminderRow<string> Row(string player, bool isOwnRow = false, bool isFull = true, bool isReadyToEndTurn = false)
     {
