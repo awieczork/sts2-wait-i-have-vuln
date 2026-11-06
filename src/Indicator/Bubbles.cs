@@ -189,17 +189,11 @@ internal static class Bubbles
         }
     }
 
-    /// <summary>A player's name for a bubble, as the player list shows it; in solo mode every row is you. Null when it cannot be read.</summary>
+    /// <summary>A player's name for a bubble, as the player list shows it. Null when it cannot be read.</summary>
     internal static string? NameOf(Player player)
     {
         try
         {
-            if (RunManager.Instance.RunLobby is null)
-            {
-                var platform = PlatformUtil.PrimaryPlatform;
-                return BubbleLines.CleanName(PlatformUtil.GetPlayerNameRaw(platform, PlatformUtil.GetLocalPlayerId(platform)));
-            }
-
             return BubbleLines.CleanName(PlatformUtil.GetPlayerNameRaw(RunManager.Instance.NetService.Platform, player.NetId));
         }
         catch (Exception)
@@ -208,11 +202,10 @@ internal static class Bubbles
         }
     }
 
-    // The local player's name, except on their own row in co-op, where they would address themselves;
-    // in solo mode every row is theirs, and talking to yourself is the joke.
+    // The local player's name, except on their own row, where they would address themselves.
     private static string? YourName(ICombatState? combat, Player speaker)
     {
-        if (RunManager.Instance.RunLobby is not null && LocalContext.IsMe(speaker))
+        if (LocalContext.IsMe(speaker))
         {
             return null;
         }

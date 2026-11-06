@@ -76,8 +76,8 @@ internal static class MultiplayerPlayerStateIndicators
     /// <summary>
     /// The rows in their on-screen order, from the indicator state rather than the icon, so the icon
     /// options do not change who gets a reminder. With <paramref name="live"/>, teammates' rows are read
-    /// from the game now, as for a reaction while an Attack is being played; the own row is always the
-    /// committed level, which during that play is the state from before it (solo mode).
+    /// from the game now, as for a reaction while an Attack is being played; the own row, which no
+    /// reminder counts, keeps its committed level.
     /// </summary>
     internal static List<HandReminderRow<Player>> ReminderRows(bool live)
     {
@@ -92,7 +92,7 @@ internal static class MultiplayerPlayerStateIndicators
 
             var player = row.Player;
             var isMe = LocalContext.IsMe(player);
-            var isFull = ReminderLevel.IsFull(live, isMe, live && !isMe && indicator.LiveLevel() == IndicatorLevel.Full, indicator.IsFull);
+            var isFull = live && !isMe ? indicator.LiveLevel() == IndicatorLevel.Full : indicator.IsFull;
             rows.Add((row.GetIndex(), new HandReminderRow<Player>(player, isMe, isFull, combat.IsPlayerReadyToEndTurn(player))));
         }
 
@@ -233,10 +233,10 @@ internal static class MultiplayerPlayerStateIndicators
     private static bool IsConnected(NMultiplayerPlayerState row)
     {
         var lobby = RunManager.Instance.RunLobby;
-        // Single-player runs have no lobby; only solo mode creates a row there, and it counts as connected.
+        // Single-player runs have no lobby, and the game creates no rows there.
         if (lobby is null)
         {
-            return SoloMode.Enabled;
+            return false;
         }
 
         return lobby.ConnectedPlayerIds.Contains(row.Player.NetId);
@@ -451,7 +451,7 @@ internal static class MultiplayerPlayerStateIndicators
             _icon = null;
         }
 
-        // Only while the card can still help a teammate: the row is a teammate's (your own only in solo mode),
+        // Only while the card can still help a teammate: the row is a teammate's,
         // its player has not ended the turn, and an enemy needs Vulnerable. Each outcome is logged, so a
         // player's godot.log shows what the bubbles did, as it does for reactions.
         private void ShowSpeechBubble(bool afterGameBubble)
@@ -466,7 +466,7 @@ internal static class MultiplayerPlayerStateIndicators
             var combat = creature.CombatState;
             var isMe = LocalContext.IsMe(player);
             var row = new HandReminderRow<Player>(player, isMe, true, CombatManager.Instance.IsPlayerReadyToEndTurn(player));
-            var outcome = HandReminderPolicy<Player, int>.SkipReason(row, HandReminders.OwnRowEligible(), Bubbles.EnemyNeedsVulnerable(combat)) is { } reason
+            var outcome = HandReminderPolicy<Player, int>.SkipReason(row, Bubbles.EnemyNeedsVulnerable(combat)) is { } reason
                 ? $"skipped, {reason}"
                 : Bubbles.Arrive(player, () => Bubbles.NextRow(combat, player), SpeechSeconds);
             Log.Info($"[{ModEntry.ModId}] Arrival bubble{(afterGameBubble ? " after the game's bubble" : "")}: {outcome} ({(isMe ? "own" : "teammate")} row).");

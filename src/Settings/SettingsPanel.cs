@@ -16,7 +16,6 @@ namespace WaitIHaveVuln.Settings;
 internal static class SettingsPanel
 {
     private const int MaxFitPasses = 3;
-    private const string SoloHint = "Shows your own row in single-player, from the next run. Off after a restart.";
     private static readonly Color Gold = new(0.94f, 0.78f, 0.25f);
     private static readonly ConditionalWeakTable<NModInfoContainer, Controls> Panels = new();
 
@@ -110,7 +109,6 @@ internal static class SettingsPanel
         private readonly Label _iconScaleValue;
         private readonly BaseButton _showHandReminder;
         private readonly BaseButton _showHandPreview;
-        private readonly BaseButton _soloMode;
 
         internal Controls(Style style, Node onScreen)
         {
@@ -166,14 +164,7 @@ internal static class SettingsPanel
             _showHandPreview = CreateToggle("Teammate hand preview");
             _showHandPreview.Toggled += on => Change(nameof(_showHandPreview), settings => settings with { ShowHandPreview = on });
 
-            _soloMode = CreateToggle("Solo mode [dev]");
-            _soloMode.Toggled += on => HookGuard.Run(nameof(_soloMode), "solo mode keeps its current state", () => SoloMode.Enabled = on);
-            var soloHint = CreateLabel(SoloHint, style.TextColor with { A = 0.7f });
-            soloHint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-            soloHint.AddThemeFontSizeOverride("font_size", (int)(style.FontSize * 0.8f));
-
-            // The row icon and the hand preview, the bubbles on top of the icon, and the developer option,
-            // each under its heading.
+            // The row icon and the hand preview, then the bubbles on top of the icon, each under its heading.
             Root.AddChild(CreateLabel("Player list", Gold));
             Root.AddChild(_showOnOwnRow);
             Root.AddChild(iconScaleRow);
@@ -182,18 +173,14 @@ internal static class SettingsPanel
             Root.AddChild(_showBubble);
             Root.AddChild(_showHandReminder);
             Root.AddChild(_variedBubbleLines);
-            Root.AddChild(CreateLabel("Developer", Gold));
-            Root.AddChild(_soloMode);
-            Root.AddChild(soloHint);
         }
 
         internal VBoxContainer Root { get; }
 
         // The image slot has a fixed height in the game's scene. When the options need more, the panel
         // scales down to fit it and widens by the same factor, so it never runs into the author and
-        // version below. The width changes the hint's wrapping, whose height the container updates only
-        // when it lays the panel out again, so each pass measures after a deferred call, until the scale
-        // holds or after a few passes.
+        // version below. The container updates its minimum size only when it lays the panel out again, so
+        // each pass measures after a deferred call, until the scale holds or after a few passes.
         internal void FitTo(Control slot)
         {
             Fit(slot, 1f, 0);
@@ -234,7 +221,6 @@ internal static class SettingsPanel
             ShowScale(settings.IconScalePercent);
             SetToggle(_showHandReminder, settings.ShowHandReminder);
             SetToggle(_showHandPreview, settings.ShowHandPreview);
-            SetToggle(_soloMode, SoloMode.Enabled);
         }
 
         // With the game's tick art, a flat toggle button that swaps its icon like the mod list's tickbox;

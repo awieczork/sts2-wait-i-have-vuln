@@ -25,7 +25,7 @@ namespace WaitIHaveVuln.Indicator;
 /// <see cref="HandReminderPolicy{TPlayer, TTurn}"/>: one cloud with the Vulnerable icon at the hovered
 /// Attack while any teammate is needed, placed by <see cref="CloudPlacement"/> once the card has
 /// settled, never moved, and gone with the hover; and a line over a needed teammate when another
-/// player plays an Attack. In solo mode your own row counts.
+/// player plays an Attack. Your own row never counts.
 /// </summary>
 internal static class HandReminders
 {
@@ -101,7 +101,7 @@ internal static class HandReminders
                 Bubbles.EnemyNeedsVulnerable(combat));
             var turn = ReactionTurn.Of(combat.RoundNumber, combat.Players.Select(player => player.PlayerCombatState?.TurnNumber ?? 0));
             var reminder = Reminders.GetValue(hand, _ => new Reminder(hand));
-            foreach (var (player, count) in reminder.Reactions.AttackPlayed((combat, turn), attacker, OwnRowEligible(), hitsNeedingEnemy,
+            foreach (var (player, count) in reminder.Reactions.AttackPlayed((combat, turn), attacker, hitsNeedingEnemy,
                 MultiplayerPlayerStateIndicators.ReminderRows(live: true)))
             {
                 if (Bubbles.React(player, () => Bubbles.NextAngry(combat, player, attacker, count), ReactionSeconds) is not null)
@@ -111,10 +111,6 @@ internal static class HandReminders
             }
         });
     }
-
-    // In solo mode your own row stands for a teammate; with "Show icon on my own row" off it shows
-    // nothing at all, as its icon does. In co-op your own row gets no bubble of any kind.
-    internal static bool OwnRowEligible() => SoloMode.Enabled && RunManager.Instance.RunLobby is null && SettingsService.Current.ShowOnOwnRow;
 
     // A won combat empties the enemies and discards the hand; IsInProgress stays true until the win is checked.
     private static bool CombatOver(CombatState combat)
@@ -365,7 +361,7 @@ internal static class HandReminders
         private bool IsNeeded(CombatState combat)
         {
             return _holder?.CardNode?.Model is { } card
-                && HandReminderPolicy<Player, int>.ShowsCloud(true, false, card.CanPlay(), CanAct(_hand, combat) && !CombatOver(combat), OwnRowEligible(),
+                && HandReminderPolicy<Player, int>.ShowsCloud(true, false, card.CanPlay(), CanAct(_hand, combat) && !CombatOver(combat),
                     Bubbles.EnemyNeedsVulnerable(combat), MultiplayerPlayerStateIndicators.ReminderRows(live: false));
         }
 

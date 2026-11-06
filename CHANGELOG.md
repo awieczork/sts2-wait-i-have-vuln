@@ -12,6 +12,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 - The mod list describes the hand preview.
 - The log has a `[WaitIHaveVuln] Arrival bubble:` line for each "Wait! I have vuln!" bubble: shown, waiting for the game's bubble, or skipped with the reason.
 
+### Removed
+
+- Solo mode [dev] is gone from Mod Settings, so single-player runs never show the co-op player list.
+
 ## [0.3.2] - 2026-11-04
 
 ### Changed

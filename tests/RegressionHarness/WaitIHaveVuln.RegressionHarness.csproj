@@ -20,7 +20,6 @@
     <Compile Include="../../src/Indicator/ReactionTurn.cs" Link="ReactionTurn.cs" />
     <Compile Include="../../src/Indicator/ArrivalQueue.cs" Link="ArrivalQueue.cs" />
     <Compile Include="../../src/Indicator/GameBubbleTiming.cs" Link="GameBubbleTiming.cs" />
-    <Compile Include="../../src/Indicator/ReminderLevel.cs" Link="ReminderLevel.cs" />
     <Compile Include="../../src/Indicator/HandReminderRow.cs" Link="HandReminderRow.cs" />
     <Compile Include="../../src/Indicator/HandReminderPolicy.cs" Link="HandReminderPolicy.cs" />
     <Compile Include="../../src/Indicator/BubbleLine.cs" Link="BubbleLine.cs" />

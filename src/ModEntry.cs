@@ -27,7 +27,7 @@ public static class ModEntry
     }
 
     // PatchAll stops at the first class that fails to bind, so a game update that breaks the
-    // settings panel or solo mode patches would also leave the indicator unpatched. Each class
+    // settings panel or one feature's patches would also leave the others unpatched. Each class
     // is patched on its own, and a failure turns off only that class.
     private static void PatchEachClass()
     {

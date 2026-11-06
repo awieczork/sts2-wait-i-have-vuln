@@ -16,7 +16,6 @@ internal static class Program
         VerifyCommitGate,
         VerifyRowTransitions,
         VerifyPendingChange,
-        VerifyReminderLevel,
         VerifyVulnerableNeed,
         VerifyReactionTurn,
         VerifyArrivalQueue,
@@ -169,16 +168,6 @@ internal static class Program
             "The end of a combat goes off at once and clears a pending change.");
     }
 
-    private static void VerifyReminderLevel()
-    {
-        Assert(ReminderLevel.IsFull(true, false, true, false), "For a reaction, a teammate is read from the game now.");
-        Assert(!ReminderLevel.IsFull(true, false, false, true), "For a reaction, a teammate who just lost the play reads as not full.");
-        Assert(ReminderLevel.IsFull(true, true, false, true),
-            "For a reaction, your own row keeps its state from before your Attack, so its cost does not hide the reminder.");
-        Assert(!ReminderLevel.IsFull(false, false, true, false) && ReminderLevel.IsFull(false, false, false, true),
-            "For the card cloud, every row reads its committed level, as its icon shows.");
-    }
-
     private static void VerifyGameBubbleTiming()
     {
         Assert(Math.Abs(GameBubbleTiming.SpeechSeconds(0.5) - 2.4) < 1e-9,
@@ -215,9 +204,9 @@ internal static class Program
 
         var policy = new Policy();
         var rows = new[] { Row("ally") };
-        Assert(policy.AttackPlayed(1, "me", false, true, rows).SequenceEqual(new[] { ("ally", 1) }), "The count starts in the first turn.");
-        Assert(policy.AttackPlayed(1, "other", false, true, rows).SequenceEqual(new[] { ("ally", 2) }), "Another attacker in the same turn raises the same count.");
-        Assert(policy.AttackPlayed(2, "me", false, true, rows).SequenceEqual(new[] { ("ally", 1) }), "A new turn key starts the count again.");
+        Assert(policy.AttackPlayed(1, "me", true, rows).SequenceEqual(new[] { ("ally", 1) }), "The count starts in the first turn.");
+        Assert(policy.AttackPlayed(1, "other", true, rows).SequenceEqual(new[] { ("ally", 2) }), "Another attacker in the same turn raises the same count.");
+        Assert(policy.AttackPlayed(2, "me", true, rows).SequenceEqual(new[] { ("ally", 1) }), "A new turn key starts the count again.");
     }
 
     private static void VerifyArrivalQueue()
@@ -341,31 +330,29 @@ internal static class Program
         var own = Row("me", isOwnRow: true);
         var ally = Row("ally");
 
-        Assert(Policy.ShowsCloud(true, false, true, true, false, true, new[] { own, ally }), "In co-op a teammate with a full icon brings the cloud.");
-        Assert(!Policy.ShowsCloud(true, false, true, true, false, true, new[] { own }), "In co-op your own row alone brings no cloud.");
-        Assert(Policy.ShowsCloud(true, false, true, true, true, true, new[] { own }), "In solo mode your own row brings the cloud.");
+        Assert(Policy.ShowsCloud(true, false, true, true, true, new[] { own, ally }), "A teammate with a full icon brings the cloud.");
+        Assert(!Policy.ShowsCloud(true, false, true, true, true, new[] { own }), "Your own row alone brings no cloud.");
 
         var notNeeded = new[]
         {
             Row("dimmed or off", isFull: false),
             Row("done", isReadyToEndTurn: true)
         };
-        Assert(!Policy.ShowsCloud(true, false, true, true, true, true, notNeeded),
+        Assert(!Policy.ShowsCloud(true, false, true, true, true, notNeeded),
             "Rows without a full icon (no card, cannot play it, dead, disconnected, outside Play) or ready to end turn bring no cloud.");
-        Assert(Policy.ShowsCloud(true, false, true, true, false, true, notNeeded.Append(ally)), "One needed teammate among the others brings the cloud.");
-        Assert(!Policy.ShowsCloud(true, false, true, true, false, false, new[] { ally }), "No cloud shows when no enemy needs Vulnerable.");
-        Assert(!Policy.ShowsCloud(true, false, true, false, false, true, new[] { ally }), "No cloud shows while the local player cannot act.");
-        Assert(!Policy.ShowsCloud(false, false, true, true, false, true, new[] { ally }), "Hovering a card that is not an Attack shows no cloud.");
-        Assert(!Policy.ShowsCloud(true, true, true, true, false, true, new[] { ally }), "Hovering an Attack that applies Vulnerable itself shows no cloud.");
-        Assert(!Policy.ShowsCloud(true, false, false, true, false, true, new[] { ally }), "Hovering an Attack you cannot play now shows no cloud.");
+        Assert(Policy.ShowsCloud(true, false, true, true, true, notNeeded.Append(ally)), "One needed teammate among the others brings the cloud.");
+        Assert(!Policy.ShowsCloud(true, false, true, true, false, new[] { ally }), "No cloud shows when no enemy needs Vulnerable.");
+        Assert(!Policy.ShowsCloud(true, false, true, false, true, new[] { ally }), "No cloud shows while the local player cannot act.");
+        Assert(!Policy.ShowsCloud(false, false, true, true, true, new[] { ally }), "Hovering a card that is not an Attack shows no cloud.");
+        Assert(!Policy.ShowsCloud(true, true, true, true, true, new[] { ally }), "Hovering an Attack that applies Vulnerable itself shows no cloud.");
+        Assert(!Policy.ShowsCloud(true, false, false, true, true, new[] { ally }), "Hovering an Attack you cannot play now shows no cloud.");
 
-        Assert(Policy.IsWorthAnnouncing(ally, false, true) && !Policy.IsWorthAnnouncing(ally, false, false), "A bubble announces a card only while an enemy needs Vulnerable.");
-        Assert(!Policy.IsWorthAnnouncing(own, false, true), "In co-op no bubble announces your own card.");
-        Assert(Policy.IsWorthAnnouncing(own, true, true), "In solo mode a bubble announces your own card, which stands for a teammate's.");
-        Assert(!Policy.IsWorthAnnouncing(Row("dimmed", isFull: false), false, true), "A dimmed or absent icon is never announced.");
-        Assert(!Policy.IsWorthAnnouncing(Row("done", isReadyToEndTurn: true), false, true), "A bubble stays quiet for a player who ended the turn.");
-        Assert(Policy.SkipReason(own, false, true) == "own row in co-op" && Policy.SkipReason(ally, false, false) == "no enemy needs Vulnerable"
-            && Policy.SkipReason(Row("done", isReadyToEndTurn: true), false, true) == "turn ended" && Policy.SkipReason(ally, false, true) is null,
+        Assert(Policy.IsWorthAnnouncing(ally, true) && !Policy.IsWorthAnnouncing(ally, false), "A bubble announces a card only while an enemy needs Vulnerable.");
+        Assert(!Policy.IsWorthAnnouncing(own, true), "No bubble announces your own card.");
+        Assert(!Policy.IsWorthAnnouncing(Row("dimmed", isFull: false), true), "A dimmed or absent icon is never announced.");
+        Assert(!Policy.IsWorthAnnouncing(Row("done", isReadyToEndTurn: true), true), "A bubble stays quiet for a player who ended the turn.");
+        Assert(Policy.SkipReason(own, true) == "own row" && Policy.SkipReason(ally, false) == "no enemy needs Vulnerable"
+            && Policy.SkipReason(Row("done", isReadyToEndTurn: true), true) == "turn ended" && Policy.SkipReason(ally, true) is null,
             "The arrival log names why a bubble stayed quiet, and nothing when it may show.");
     }
 
@@ -374,14 +361,14 @@ internal static class Program
         var policy = new Policy();
         var rows = new[] { Row("me", isOwnRow: true), Row("ally"), Row("other", isFull: false) };
 
-        Assert(policy.AttackPlayed(1, "me", false, true, rows).SequenceEqual(new[] { ("ally", 1) }),
+        Assert(policy.AttackPlayed(1, "me", true, rows).SequenceEqual(new[] { ("ally", 1) }),
             "Your Attack makes a teammate with a full icon react, as the first Attack of the turn.");
-        Assert(policy.AttackPlayed(1, "other", false, true, rows).SequenceEqual(new[] { ("ally", 2) }), "Another teammate's Attack counts too.");
-        Assert(policy.AttackPlayed(1, "me", false, true, rows).SequenceEqual(new[] { ("ally", 3) }), "Each Attack in the turn raises the count.");
-        Assert(policy.AttackPlayed(1, "ally", false, true, rows).Count == 0, "The holder's own Attack brings no reaction.");
-        Assert(policy.AttackPlayed(1, "me", false, false, rows).Count == 0, "An Attack that hits no enemy needing Vulnerable brings no reaction.");
-        Assert(policy.AttackPlayed(1, "me", false, true, rows).SequenceEqual(new[] { ("ally", 4) }), "An Attack nobody reacts to does not count.");
-        Assert(policy.AttackPlayed(2, "me", false, true, rows).SequenceEqual(new[] { ("ally", 1) }), "A new turn starts the count again.");
+        Assert(policy.AttackPlayed(1, "other", true, rows).SequenceEqual(new[] { ("ally", 2) }), "Another teammate's Attack counts too.");
+        Assert(policy.AttackPlayed(1, "me", true, rows).SequenceEqual(new[] { ("ally", 3) }), "Each Attack in the turn raises the count.");
+        Assert(policy.AttackPlayed(1, "ally", true, rows).Count == 0, "The holder's own Attack brings no reaction.");
+        Assert(policy.AttackPlayed(1, "me", false, rows).Count == 0, "An Attack that hits no enemy needing Vulnerable brings no reaction.");
+        Assert(policy.AttackPlayed(1, "me", true, rows).SequenceEqual(new[] { ("ally", 4) }), "An Attack nobody reacts to does not count.");
+        Assert(policy.AttackPlayed(2, "me", true, rows).SequenceEqual(new[] { ("ally", 1) }), "A new turn starts the count again.");
 
         foreach (var (row, what) in new[]
         {
@@ -389,17 +376,17 @@ internal static class Program
             (Row("ally", isReadyToEndTurn: true), "who ended the turn")
         })
         {
-            Assert(policy.AttackPlayed(2, "me", false, true, new[] { row }).Count == 0, $"A teammate {what} does not react.");
+            Assert(policy.AttackPlayed(2, "me", true, new[] { row }).Count == 0, $"A teammate {what} does not react.");
         }
 
         var two = new Policy();
         var holders = new[] { Row("a"), Row("b") };
-        Assert(two.AttackPlayed(1, "me", false, true, holders).SequenceEqual(new[] { ("a", 1), ("b", 1) }), "Every needed teammate reacts, in row order.");
-        Assert(two.AttackPlayed(1, "a", false, true, holders).SequenceEqual(new[] { ("b", 2) }), "A holder's Attack makes the other holder react, and not itself.");
+        Assert(two.AttackPlayed(1, "me", true, holders).SequenceEqual(new[] { ("a", 1), ("b", 1) }), "Every needed teammate reacts, in row order.");
+        Assert(two.AttackPlayed(1, "a", true, holders).SequenceEqual(new[] { ("b", 2) }), "A holder's Attack makes the other holder react, and not itself.");
 
-        Assert(new Policy().AttackPlayed(1, "ally", false, true, new[] { Row("me", isOwnRow: true) }).Count == 0, "In co-op your own row never reacts.");
-        Assert(new Policy().AttackPlayed(1, "me", true, true, new[] { Row("me", isOwnRow: true) }).SequenceEqual(new[] { ("me", 1) }),
-            "In solo mode your own Attack counts for your own row, which stands for a teammate.");
+        Assert(new Policy().AttackPlayed(1, "ally", true, new[] { Row("me", isOwnRow: true) }).Count == 0, "Your own row never reacts.");
+        Assert(new Policy().AttackPlayed(1, "me", true, new[] { Row("me", isOwnRow: true) }).Count == 0,
+            "Your own Attack brings no reaction from your own row, even with its icon full.");
     }
 
     private static void VerifyBubbleLines()

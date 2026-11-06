@@ -22,10 +22,12 @@ body:
       label: Mod settings
       description: From the main menu, Settings > Mod Settings > Wait! I Have Vuln!. With "Show icon on my own row" off, your own row shows nothing.
       placeholder: |
-        Show speech bubble: on
         Show icon on my own row: on
         Icon size: 100%
-        Solo mode [dev]: off
+        Teammate hand preview: on
+        Show bubbles: on
+        Card reminder: on
+        Varied bubble lines: on
   - type: dropdown
     id: role
     attributes:

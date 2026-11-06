@@ -67,7 +67,7 @@ Your choices are kept for the next game in `%APPDATA%\SlayTheSpire2\WaitIHaveVul
 - **The hand preview needs the mouse.** It does not open while you play with a controller.
 - **Needs game version 0.107.1 or newer.**
 - **Not tested yet:** Mad Science with the Sapping rider, the hand preview's numbers after a teammate's Strength, Weak, or cost changes, using the settings with a controller, macOS, Linux, and Steam Deck.
-- **Single-player looks the same as without the mod.** **Solo mode [dev]** in the settings is a testing aid: it shows your own row in single-player runs from the next run you start or continue, and it turns off when the game restarts.
+- **Single-player looks the same as without the mod,** because the game shows the player list only in co-op.
 
 ## Install
 
@@ -99,7 +99,7 @@ To bring your normal progress into the modded profile, follow the [save guide](d
 3. Run `dotnet build WaitIHaveVuln.csproj`.
 4. Run `dotnet run --project tests/RegressionHarness/WaitIHaveVuln.RegressionHarness.csproj`.
 
-Deployment, testing alone with solo mode, and the release checklist are in [CONTRIBUTING.md](CONTRIBUTING.md).
+Deployment, testing in local co-op on one PC, and the release checklist are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What's changed
 

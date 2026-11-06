@@ -24,8 +24,7 @@ The workspace recommends the C# extension for VS Code, but any editor works.
 | `src/Patches/` | Thin Harmony postfixes on the co-op player row lifecycle (one patch class per feature), the local hand's hover and card pick-up, card plays, and the modding screen's mod details; `PatchTarget.cs` lets each patch class skip itself with one log line when the game renamed its target. |
 | `src/Indicator/` | Row icon and speech bubble (`MultiplayerVulnerableIndicator.cs`), the card reminder cloud and the teammates' reactions (`HandReminders.cs`, `Bubbles.cs`), and the engine-independent logic the harness links: the card set, hand state, reminder rules, bubble lines, and cloud placement. |
 | `src/HandPreview/` | Teammate hand preview on the row's card count (`RowHandPreview.cs`, `HandPreviews.cs`), and the engine-independent logic the harness links: when it opens, the strip layout, and the shown cards. |
-| `src/Settings/` | Settings panel (`SettingsPanel.cs`, with `GameSliderLook.cs` and `NodeSearch.cs` matching it to the game's controls), current settings (`SettingsService.cs`), solo mode (`SoloMode.cs`), and engine-independent logic (`PlayerSettings.cs`, `SettingsStore.cs`, `SettingsLoadOutcome.cs`). |
-| `src/Testing/` | Solo mode patches, which create your own co-op row in single-player runs while solo mode is on. |
+| `src/Settings/` | Settings panel (`SettingsPanel.cs`, with `GameSliderLook.cs` and `NodeSearch.cs` matching it to the game's controls), current settings (`SettingsService.cs`), and engine-independent logic (`PlayerSettings.cs`, `SettingsStore.cs`, `SettingsLoadOutcome.cs`). |
 | `tests/RegressionHarness/` | Console harness that links the engine-independent sources and drives them with a fake hand and a temporary settings folder. |
 | `scripts/` | Player helpers that copy normal saves into the modded profile, described in `docs/modded-saves.md`, and `launch-coop.ps1` for a local co-op test. Not part of the mod. |
 | `docs/` | Player guides linked from the README. |
@@ -44,7 +43,7 @@ The first build restores the Godot .NET SDK package.
 The regular build does not deploy; `DeployMod` defaults to `false`.
 The VS Code task `build (safe)` runs the same build.
 
-The harness covers the supported card set, hand transitions, rebinding, suspended tracking, owner cleanup, independent local and remote rows, settings parsing, clamping, and migration, the own-row visibility rule, saving and loading the settings file, when the card cloud and the teammates' reactions show, the bubble lines, and where the cloud goes at the hovered card.
+The harness covers the supported card set, hand transitions, rebinding, suspended tracking, owner cleanup, independent local and remote rows, settings parsing, clamping, and migration, the own-row visibility rule, saving and loading the settings file, when the card cloud and the teammates' reactions show, the bubble lines, where the cloud goes at the hovered card, and when the teammate hand preview opens and how it lays out its cards.
 It does not load the game, so it cannot verify resource loading, layout, the settings panel, or multiplayer behaviour.
 The harness treats compiler warnings as errors, and GitHub Actions runs it on every push to `main` and every pull request; CI does not build the mod itself, because that build needs the game's assemblies.
 
@@ -61,18 +60,9 @@ Close the game first; it locks the DLL.
 Then start the game, accept the mods warning on the first modded launch, enable the mod under Settings > Mod Settings, and look for `[WaitIHaveVuln] Mod initialized.` in `%APPDATA%\SlayTheSpire2\logs\godot.log`.
 That line confirms the patches were installed, not that the icon rendered.
 
-### Solo mode
-
-To check the icon, the bubbles, and the card cloud alone, open Settings > Mod Settings from the main menu, select the mod, turn on **Solo mode [dev]**, and then start or continue a single-player run.
-The game then creates your own co-op row and treats the missing lobby as connected; the log says `Solo mode [dev] on`.
-Solo mode is never saved, so it is off after every game restart, and a change applies from the next run you start or continue.
-Your own row then stands for a teammate: your character says "Wait! I have vuln!", which it never does in co-op, hovering an Attack shows the card cloud, and your own Attacks bring its reactions.
-With **Show icon on my own row** off, the solo row shows nothing, because it is your own row.
-It does not exercise remote hands, hosting, or reconnects; local co-op below covers remote hands and hosting.
-
 ### Local co-op
 
-To test with a real teammate row, run two copies of the game on one PC, one hosting and one joining over `127.0.0.1`.
+The mod draws only on co-op rows, so check it in the game with two copies on one PC, one hosting and one joining over `127.0.0.1`.
 Close the game, then start the host from the repository root and wait for its co-op character select:
 
 ```powershell
@@ -97,7 +87,7 @@ Both copies start outside Steam (`--force-steam off`), so the players are "Test 
 - To repeat a combat check without making moves: Save and Quit, change the settings on the main menu, and Continue. Continuing a run saved in combat restarts that combat at turn 1 with the same hand, so the bubble shows again on every Continue.
 - A single-player run in progress has to be continued or abandoned before a new one can start; look for Continue on the main menu before planning a fresh run.
 - The game keeps five `godot*.log` files and renames the current one at each launch, so copy the log out before a test that restarts the game several times.
-- Filter the log on `[WaitIHaveVuln]`. `Asset not cached`, `Progress parse: ... Unknown card ID`, and the leaked RID and ObjectDB lines at exit come from the game. The mod logs `Mod initialized.`, `Settings slider: copied the game's slider look (...)`, `Solo mode [dev] on` or `off`, an `Arrival bubble:` line for each "Wait! I have vuln!" bubble (shown, waiting for the game's bubble, or skipped with the reason, such as your own row in co-op), a `Card reminder:` line for each cloud with its side and the tip boxes it avoided, and a `Reaction:` line with the tier for each angry line. `Skipped <class>: ... not found` means a game update renamed a patched member and that feature is off.
+- Filter the log on `[WaitIHaveVuln]`. `Asset not cached`, `Progress parse: ... Unknown card ID`, and the leaked RID and ObjectDB lines at exit come from the game. The mod logs `Mod initialized.`, `Settings slider: copied the game's slider look (...)`, an `Arrival bubble:` line for each "Wait! I have vuln!" bubble (shown, waiting for the game's bubble, or skipped with the reason, such as your own row), a `Card reminder:` line for each cloud with its side and the tip boxes it avoided, and a `Reaction:` line with the tier for each angry line. `Skipped <class>: ... not found` means a game update renamed a patched member and that feature is off.
 
 A successful compile and harness run are not runtime verification; co-op behaviour needs a real session, such as local co-op.
 
