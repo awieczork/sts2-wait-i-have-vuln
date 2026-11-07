@@ -84,7 +84,8 @@ internal static class GameSliderLook
             var none = EmptyIcon();
             slider.AddThemeIconOverride("grabber", none);
             slider.AddThemeIconOverride("grabber_highlight", none);
-            slider.Draw += () => PlaceHandle(slider, handleCopy);
+            Action place = () => PlaceHandle(slider, handleCopy);
+            slider.Draw += () => HookGuard.Run("Settings slider handle", "the handle keeps its last place", place);
             overhang = handleCopy.Size.X * 0.5f;
         }
 

@@ -42,8 +42,6 @@ internal static class VulnerableCardPredicate
     internal const string MadScienceId = "MAD_SCIENCE";
     internal const string SappingRider = "Sapping";
 
-    internal static bool IsSupported(string modelId) => SupportedModelIds.Contains(modelId);
-
     /// <summary>
     /// Whether a card applies Vulnerable when played: one of the supported ids, or a Mad Science
     /// copy whose Tinker Time rider (<paramref name="madScienceRider"/>, the rider's enum name, null for

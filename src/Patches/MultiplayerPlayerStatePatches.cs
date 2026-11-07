@@ -7,12 +7,11 @@ using WaitIHaveVuln.Indicator;
 
 namespace WaitIHaveVuln.Patches;
 
-// Parameter names must match the game's method parameters and fields exactly; Harmony binds by name.
+// Injected field names must match the game's private fields exactly; Harmony binds by name.
 
 [HarmonyPatch(typeof(NMultiplayerPlayerState), "OnCombatSetUp")]
 internal static class MultiplayerPlayerStateCombatSetUpPatch
 {
-    // Harmony calls it first with no target, before it binds anything.
     private static bool Prepare(MethodBase? original)
     {
         return original is not null || PatchTarget.Exists(nameof(MultiplayerPlayerStateCombatSetUpPatch), "the row icon and bubbles", typeof(NMultiplayerPlayerState), "OnCombatSetUp", null,
@@ -34,7 +33,6 @@ internal static class MultiplayerPlayerStateCombatSetUpPatch
 [HarmonyPatch(typeof(NMultiplayerPlayerState), "RefreshConnectedState", new Type[0])]
 internal static class MultiplayerPlayerStateConnectionStatePatch
 {
-    // Harmony calls it first with no target, before it binds anything.
     private static bool Prepare(MethodBase? original)
     {
         return original is not null || PatchTarget.Exists(nameof(MultiplayerPlayerStateConnectionStatePatch), "the row's disconnect handling", typeof(NMultiplayerPlayerState), "RefreshConnectedState", Type.EmptyTypes);
@@ -50,7 +48,6 @@ internal static class MultiplayerPlayerStateConnectionStatePatch
 [HarmonyPatch(typeof(NMultiplayerPlayerState), "OnCombatEnded")]
 internal static class MultiplayerPlayerStateCombatEndedPatch
 {
-    // Harmony calls it first with no target, before it binds anything.
     private static bool Prepare(MethodBase? original)
     {
         return original is not null || PatchTarget.Exists(nameof(MultiplayerPlayerStateCombatEndedPatch), "hiding the row icon at combat end", typeof(NMultiplayerPlayerState), "OnCombatEnded");
@@ -66,7 +63,6 @@ internal static class MultiplayerPlayerStateCombatEndedPatch
 [HarmonyPatch(typeof(NMultiplayerPlayerState), nameof(NMultiplayerPlayerState._ExitTree))]
 internal static class MultiplayerPlayerStateExitTreePatch
 {
-    // Harmony calls it first with no target, before it binds anything.
     private static bool Prepare(MethodBase? original)
     {
         return original is not null || PatchTarget.Exists(nameof(MultiplayerPlayerStateExitTreePatch), "the row's cleanup", typeof(NMultiplayerPlayerState), nameof(NMultiplayerPlayerState._ExitTree));

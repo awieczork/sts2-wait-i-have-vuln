@@ -1,16 +1,18 @@
 using Godot;
 using MegaCrit.Sts2.Core.Logging;
+using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Powers;
 
 namespace WaitIHaveVuln.Indicator;
 
-/// <summary>The game's Vulnerable power icon, for the row icon and the arm's thought cloud.</summary>
+/// <summary>The game's Vulnerable power icon, for the row icon and the card reminder's thought cloud.</summary>
 internal static class VulnerableIcon
 {
-    private const string Path = "res://images/atlases/power_atlas.sprites/vulnerable_power.tres";
     private static bool _loadAttempted;
     private static Texture2D? _texture;
 
-    // Loaded once per process. A failure is logged once and leaves the icon off until restart.
+    // Loaded once per process through the game's own accessor (PowerModel.Icon, as the game's power icons
+    // load it), so a moved atlas follows the game. A failure is logged once and leaves the icon off until restart.
     internal static Texture2D? Texture
     {
         get
@@ -23,17 +25,17 @@ internal static class VulnerableIcon
             _loadAttempted = true;
             try
             {
-                _texture = ResourceLoader.Load<Texture2D>(Path);
+                _texture = ModelDb.Power<VulnerablePower>().Icon;
             }
             catch (Exception exception)
             {
-                Log.Warn($"[{ModEntry.ModId}] Could not load the Vulnerable icon at '{Path}': {exception.Message}");
+                Log.Warn($"[{ModEntry.ModId}] Could not load the Vulnerable icon: {exception.Message}");
                 return null;
             }
 
             if (_texture is null)
             {
-                Log.Warn($"[{ModEntry.ModId}] Could not load the Vulnerable icon at '{Path}'.");
+                Log.Warn($"[{ModEntry.ModId}] Could not load the Vulnerable icon.");
             }
 
             return _texture;

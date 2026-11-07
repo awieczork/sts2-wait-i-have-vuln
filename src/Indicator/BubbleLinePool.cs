@@ -12,7 +12,9 @@ internal sealed class BubbleLinePool
     private readonly Random _random;
     private readonly List<int> _bag = new();
     private int _last = -1;
-    private object? _combat;
+    // Held weakly, so the pool does not keep a finished combat, and the whole combat state with it, alive
+    // until the next combat's first bubble; null for a null combat.
+    private WeakReference<object>? _combat;
 
     internal BubbleLinePool(IReadOnlyList<string> lines, Random random, string? signature = null)
     {
@@ -27,12 +29,12 @@ internal sealed class BubbleLinePool
     /// The next line for <paramref name="combat"/>, or null when every line is on screen or needs a
     /// missing name. The first pick in a new combat is the signature, unless it is on screen.
     /// </summary>
-    internal BubbleLine? Next(object? combat, Func<BubbleLine, bool> isOnScreen, string? you, string? them, string? attacker = null)
+    internal BubbleLine? Next(object? combat, Func<BubbleLine, bool> isOnScreen, string? you, string? attacker = null)
     {
         ArgumentNullException.ThrowIfNull(isOnScreen);
-        if (_signature is not null && !Equals(combat, _combat))
+        if (_signature is not null && !IsCurrentCombat(combat))
         {
-            _combat = combat;
+            _combat = combat is null ? null : new WeakReference<object>(combat);
             var signature = new BubbleLine(_signature);
             if (!isOnScreen(signature))
             {
@@ -48,21 +50,25 @@ internal sealed class BubbleLinePool
             }
         }
 
-        _combat = combat;
-        if (Take(isOnScreen, you, them, attacker) is { } line)
+        if (Take(isOnScreen, you, attacker) is { } line)
         {
             return line;
         }
 
         Refill();
-        return Take(isOnScreen, you, them, attacker);
+        return Take(isOnScreen, you, attacker);
     }
 
-    private BubbleLine? Take(Func<BubbleLine, bool> isOnScreen, string? you, string? them, string? attacker)
+    private bool IsCurrentCombat(object? combat)
+    {
+        return _combat is null ? combat is null : _combat.TryGetTarget(out var current) && Equals(current, combat);
+    }
+
+    private BubbleLine? Take(Func<BubbleLine, bool> isOnScreen, string? you, string? attacker)
     {
         foreach (var index in _bag)
         {
-            if (index == _last || BubbleLines.Fill(_lines[index], you, them, attacker) is not { } text || isOnScreen(new BubbleLine(text)))
+            if (index == _last || BubbleLines.Fill(_lines[index], you, attacker) is not { } text || isOnScreen(new BubbleLine(text)))
             {
                 continue;
             }

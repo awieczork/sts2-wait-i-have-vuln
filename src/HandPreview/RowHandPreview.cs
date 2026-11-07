@@ -11,7 +11,6 @@ using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
-using WaitIHaveVuln.Indicator;
 using WaitIHaveVuln.Settings;
 
 namespace WaitIHaveVuln.HandPreview;
@@ -36,10 +35,13 @@ internal sealed class RowHandPreview
     private readonly List<NCard> _cards = new();
     private readonly ShownCards<CardModel> _shown = new(CardPile.MaxCardsInHand);
     private readonly Action<CombatState> _onCombatStateChanged;
+    private readonly Dictionary<ulong, bool> _modNodes = new();
     private SceneTree? _frameTree;
     private CombatStateTracker? _tracker;
     private Control? _holder;
     private bool _visualsDue;
+    // Where the row's content ended when the strip was last laid out.
+    private float _laidOutRight;
 
     internal RowHandPreview(NMultiplayerPlayerState row, Control counter, HBoxContainer topLine, NHealthBar healthBar)
     {
@@ -54,7 +56,7 @@ internal sealed class RowHandPreview
     internal void BeginCombat()
     {
         Stop();
-        if (!SettingsService.Current.ShowHandPreview || LocalContext.IsMe(_row.Player))
+        if (!HandPreviewRule.Watches(SettingsService.Current.ShowHandPreview, LocalContext.IsMe(_row.Player)))
         {
             return;
         }
@@ -66,11 +68,8 @@ internal sealed class RowHandPreview
         }
     }
 
-    internal void EndCombat() => Stop();
-
-    internal void Dispose() => Stop();
-
-    private void Stop()
+    /// <summary>Closes the preview, returns its cards to the game's pool, and stops watching, at combat end or when the row leaves.</summary>
+    internal void Stop()
     {
         if (_frameTree is not null && GodotObject.IsInstanceValid(_frameTree))
         {
@@ -78,6 +77,7 @@ internal sealed class RowHandPreview
         }
 
         _frameTree = null;
+        _modNodes.Clear();
         Close();
         if (_holder is not null && GodotObject.IsInstanceValid(_holder))
         {
@@ -111,10 +111,11 @@ internal sealed class RowHandPreview
 
         var hand = _row.Player.PlayerCombatState?.Hand.Cards;
         var open = hand is not null && HandPreviewRule.IsOpen(
-            true,
             _counter.IsVisibleInTree(),
             NControllerManager.Instance?.IsUsingController ?? false,
+            IsRowHovered(),
             _counter.GetGlobalRect().HasPoint(_counter.GetGlobalMousePosition()),
+            // NTargetManager.Instance is reached through NRun.Instance and throws without a run.
             NRun.Instance is not null && NTargetManager.Instance.IsInSelection,
             NPlayerHand.Instance?.InCardPlay ?? false,
             NHoverTipSet.shouldBlockHoverTips);
@@ -129,12 +130,23 @@ internal sealed class RowHandPreview
         {
             Rebuild(hand!);
         }
+        else if (_holder is { } holder && ContentRight(holder) != _laidOutRight)
+        {
+            // The row's content changed while the hand did not, such as the Vulnerable icon appearing.
+            Layout(holder);
+        }
 
         if (_visualsDue)
         {
             RefreshVisuals();
         }
     }
+
+    // Godot's own hovered control: the card counter stops the mouse, so it is the row's, while a screen
+    // drawn over the player list (pile view, map, pause menu) takes the hover and keeps the preview closed.
+    // The row hitbox's hover is not used, because it starts narrower than a row with a long name.
+    private bool IsRowHovered() =>
+        _row.GetViewport()?.GuiGetHoveredControl() is { } hovered && (hovered == _row || _row.IsAncestorOf(hovered));
 
     private void Open()
     {
@@ -215,7 +227,8 @@ internal sealed class RowHandPreview
             screen.Position.Y + ScreenMargin,
             screen.Size.X - 2f * ScreenMargin,
             screen.Size.Y - 2f * ScreenMargin);
-        var strip = HandStripLayout.Place(_cards.Count, ContentRight(holder) + RowGap, row.Position.Y, bounds, NCard.defaultSize.X, NCard.defaultSize.Y);
+        _laidOutRight = ContentRight(holder);
+        var strip = HandStripLayout.Place(_cards.Count, _laidOutRight + RowGap, row.Position.Y, bounds, NCard.defaultSize.X, NCard.defaultSize.Y);
         var toHolder = holder.GetGlobalTransform().AffineInverse();
         for (var i = 0; i < _cards.Count; i++)
         {
@@ -228,14 +241,17 @@ internal sealed class RowHandPreview
     // (NMultiplayerPlayerState.UpdateSelectionReticleWidth): the last visible item of the name line and
     // the health bar. The row's own rect is the whole player list's width, far past the content. Nodes
     // the mod adds to the row, such as the Vulnerable icon, carry the mod id in their name and count too.
+    // Runs every frame while the preview is open, so it walks the children by index, which allocates no
+    // Godot array.
     private float ContentRight(Control holder)
     {
         var right = _row.GlobalPosition.X;
         if (GodotObject.IsInstanceValid(_topLine))
         {
-            foreach (var child in _topLine.GetChildren())
+            var count = _topLine.GetChildCount();
+            for (var i = 0; i < count; i++)
             {
-                if (child is Control { Visible: true } item && item.Size.X > 0f)
+                if (_topLine.GetChild(i) is Control { Visible: true } item && item.Size.X > 0f)
                 {
                     right = Mathf.Max(right, item.GetGlobalRect().End.X);
                 }
@@ -247,15 +263,29 @@ internal sealed class RowHandPreview
             right = Mathf.Max(right, bar.GetGlobalRect().End.X);
         }
 
-        foreach (var child in _row.GetChildren())
+        var rowChildren = _row.GetChildCount();
+        for (var i = 0; i < rowChildren; i++)
         {
-            if (child is Control { Visible: true } added && !ReferenceEquals(added, holder) && added.Name.ToString().StartsWith(ModEntry.ModId, StringComparison.Ordinal))
+            if (_row.GetChild(i) is Control { Visible: true } added && !ReferenceEquals(added, holder) && IsModNode(added))
             {
                 right = Mathf.Max(right, added.GetGlobalRect().End.X);
             }
         }
 
         return right;
+    }
+
+    // Remembered per node, because reading a node's name makes a new string each time.
+    private bool IsModNode(Node node)
+    {
+        var id = node.GetInstanceId();
+        if (!_modNodes.TryGetValue(id, out var isModNode))
+        {
+            isModNode = node.Name.ToString().StartsWith(ModEntry.ModId, StringComparison.Ordinal);
+            _modNodes[id] = isModNode;
+        }
+
+        return isModNode;
     }
 
     // A card's text follows its owner's powers and energy, so it is redrawn after each combat state

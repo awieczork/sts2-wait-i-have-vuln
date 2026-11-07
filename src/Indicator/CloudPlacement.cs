@@ -10,12 +10,13 @@ namespace WaitIHaveVuln.Indicator;
 internal static class CloudPlacement
 {
     // The hovered card lifts and grows at once but slides sideways to its spot over several frames, from
-    // where its neighbour's hover pushed it; the cloud waits for that, so the card cannot slide into it.
+    // where its neighbour's hover pushed it. The cloud shows at once beside that spot and moves with the
+    // slide; once the card has settled, its spot is checked once more.
     internal const double MinWaitSeconds = 0.15;
     internal const double MaxWaitSeconds = 0.6;
     internal const float SettledOffset = 1f;
 
-    /// <summary>Whether the hovered card has settled enough to place the cloud: close to its spot after the shortest wait, or the longest wait is over.</summary>
+    /// <summary>Whether the hovered card has settled enough to check the cloud's spot again: close to its spot after the shortest wait, or the longest wait is over.</summary>
     internal static bool IsSettled(float remainingOffset, double waitedSeconds)
     {
         return waitedSeconds >= MaxWaitSeconds || (waitedSeconds >= MinWaitSeconds && remainingOffset <= SettledOffset);

@@ -13,7 +13,6 @@ namespace WaitIHaveVuln.Patches;
 [HarmonyPatch(typeof(NModInfoContainer), nameof(NModInfoContainer.Fill))]
 internal static class ModInfoContainerFillPatch
 {
-    // Harmony calls it first with no target, before it binds anything.
     private static bool Prepare(MethodBase? original)
     {
         return original is not null || PatchTarget.Exists(nameof(ModInfoContainerFillPatch), "the settings panel", typeof(NModInfoContainer), nameof(NModInfoContainer.Fill), null, "_image", "_description");

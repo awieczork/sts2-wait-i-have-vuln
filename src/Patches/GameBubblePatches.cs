@@ -14,7 +14,6 @@ namespace WaitIHaveVuln.Patches;
 [HarmonyPatch(typeof(NSpeechBubbleVfx), nameof(NSpeechBubbleVfx.Create), new[] { typeof(string), typeof(Creature), typeof(double), typeof(VfxColor) })]
 internal static class SpeechBubbleCreatePatch
 {
-    // Harmony calls it first with no target, before it binds anything.
     private static bool Prepare(MethodBase? original)
     {
         return original is not null || PatchTarget.Exists(nameof(SpeechBubbleCreatePatch), "giving way to the game's speech bubbles", typeof(NSpeechBubbleVfx),
@@ -31,7 +30,6 @@ internal static class SpeechBubbleCreatePatch
 [HarmonyPatch(typeof(NThoughtBubbleVfx), nameof(NThoughtBubbleVfx.Create), new[] { typeof(string), typeof(Creature), typeof(double?) })]
 internal static class ThoughtBubbleCreatePatch
 {
-    // Harmony calls it first with no target, before it binds anything.
     private static bool Prepare(MethodBase? original)
     {
         return original is not null || PatchTarget.Exists(nameof(ThoughtBubbleCreatePatch), "giving way to the game's thought bubbles", typeof(NThoughtBubbleVfx),

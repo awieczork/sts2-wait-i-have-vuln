@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Modding;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.Screens.ModdingScreen;
@@ -15,8 +16,8 @@ namespace WaitIHaveVuln.Settings;
 /// </summary>
 internal static class SettingsPanel
 {
-    private const int MaxFitPasses = 3;
-    private static readonly Color Gold = new(0.94f, 0.78f, 0.25f);
+    // The game's own gold, for the headings and the hover text.
+    private static readonly Color Gold = StsColors.gold;
     private static readonly ConditionalWeakTable<NModInfoContainer, Controls> Panels = new();
 
     internal static void OnModInfoFilled(NModInfoContainer container, Mod mod, TextureRect image, RichTextLabel description)
@@ -131,20 +132,21 @@ internal static class SettingsPanel
             _iconScale = CreateSlider(onScreen, out var overhang);
             // A drag saves once when it ends; a keyboard step or a click outside a drag saves at once.
             var dragging = false;
-            _iconScale.DragStarted += () => dragging = true;
-            _iconScale.DragEnded += _ =>
+            const string scaleFailure = "the icon size may keep its current value";
+            _iconScale.DragStarted += () => HookGuard.Run(nameof(_iconScale), scaleFailure, () => dragging = true);
+            _iconScale.DragEnded += _ => HookGuard.Run(nameof(_iconScale), scaleFailure, () =>
             {
                 dragging = false;
                 SaveScale();
-            };
-            _iconScale.ValueChanged += value =>
+            });
+            _iconScale.ValueChanged += value => HookGuard.Run(nameof(_iconScale), scaleFailure, () =>
             {
                 ShowScale((int)Math.Round(value));
                 if (!dragging)
                 {
                     SaveScale();
                 }
-            };
+            });
             var iconScaleRow = new HBoxContainer();
             iconScaleRow.AddThemeConstantOverride("separation", style.FontSize / 2);
             iconScaleRow.AddChild(CreateLabel("Icon size", style.TextColor));
@@ -179,35 +181,19 @@ internal static class SettingsPanel
 
         // The image slot has a fixed height in the game's scene. When the options need more, the panel
         // scales down to fit it and widens by the same factor, so it never runs into the author and
-        // version below. The container updates its minimum size only when it lays the panel out again, so
-        // each pass measures after a deferred call, until the scale holds or after a few passes.
+        // version below. Called deferred, after layout. No control in the panel wraps its text, so the
+        // width does not change the height it needs, and one measurement is enough.
         internal void FitTo(Control slot)
-        {
-            Fit(slot, 1f, 0);
-        }
-
-        private void Fit(Control slot, float scale, int pass)
         {
             if (!GodotObject.IsInstanceValid(Root) || !GodotObject.IsInstanceValid(slot) || slot.Size.X <= 0f || slot.Size.Y <= 0f)
             {
                 return;
             }
 
-            if (pass > 0)
-            {
-                var needed = Root.GetCombinedMinimumSize().Y;
-                var fit = needed > slot.Size.Y ? slot.Size.Y / needed : 1f;
-                if (Mathf.IsEqualApprox(fit, scale) || pass > MaxFitPasses)
-                {
-                    return;
-                }
-
-                scale = fit;
-            }
-
+            var needed = Root.GetCombinedMinimumSize().Y;
+            var scale = needed > slot.Size.Y ? slot.Size.Y / needed : 1f;
             Root.Scale = new Vector2(scale, scale);
             Root.OffsetRight = slot.OffsetRight + slot.Size.X * (1f / scale - 1f);
-            Callable.From(() => HookGuard.Run("Settings fit", "the settings keep their size", () => Fit(slot, scale, pass + 1))).CallDeferred();
         }
 
         // Reads the current values without firing the change handlers.
@@ -251,7 +237,7 @@ internal static class SettingsPanel
             button.AddThemeColorOverride("font_focus_color", _style.TextColor);
             button.AddThemeColorOverride("font_pressed_color", _style.TextColor);
             button.AddThemeStyleboxOverride("focus", FocusOutline());
-            button.Toggled += on => button.Icon = on ? _style.Ticked : _style.NotTicked;
+            button.Toggled += on => HookGuard.Run(text, "the tick may not match the setting", () => button.Icon = on ? _style.Ticked : _style.NotTicked);
             return button;
         }
 

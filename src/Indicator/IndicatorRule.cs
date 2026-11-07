@@ -8,9 +8,15 @@ namespace WaitIHaveVuln.Indicator;
 /// </summary>
 internal static class IndicatorRule
 {
-    internal static IndicatorLevel Level(bool combatLive, bool isConnected, bool isAlive, bool isInPlayPhase, bool holdsSupportedCard, bool canPlaySupportedCard)
+    /// <summary>Whether the row may show at all; the hand is read only when it may, because the game's play check runs per card.</summary>
+    internal static bool MayShow(bool combatLive, bool isConnected, bool isAlive, bool isInPlayPhase)
     {
-        if (!combatLive || !isConnected || !isAlive || !isInPlayPhase || !holdsSupportedCard)
+        return combatLive && isConnected && isAlive && isInPlayPhase;
+    }
+
+    internal static IndicatorLevel Level(bool mayShow, bool holdsSupportedCard, bool canPlaySupportedCard)
+    {
+        if (!mayShow || !holdsSupportedCard)
         {
             return IndicatorLevel.Off;
         }

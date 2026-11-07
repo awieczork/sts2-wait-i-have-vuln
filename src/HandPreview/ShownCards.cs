@@ -4,7 +4,7 @@ namespace WaitIHaveVuln.HandPreview;
 /// The cards the preview shows, in order, compared by reference with the live hand every frame. The hand
 /// changes silently too (silent adds and removes, reorders raise no event), so the preview compares
 /// instead of listening. Holds at most <paramref name="capacity"/> entries in one array and allocates
-/// nothing per comparison.
+/// nothing per comparison; a hand larger than that matches on its first <paramref name="capacity"/> cards.
 /// </summary>
 internal sealed class ShownCards<T>(int capacity) where T : class
 {
@@ -12,12 +12,10 @@ internal sealed class ShownCards<T>(int capacity) where T : class
 
     internal int Count { get; private set; }
 
-    internal T? this[int index] => _cards[index];
-
     /// <summary>Whether <paramref name="hand"/> is the same cards in the same order as the shown ones.</summary>
     internal bool Matches(IReadOnlyList<T> hand)
     {
-        if (hand.Count != Count)
+        if (Math.Min(hand.Count, _cards.Length) != Count)
         {
             return false;
         }

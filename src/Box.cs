@@ -1,6 +1,6 @@
-namespace WaitIHaveVuln.Indicator;
+namespace WaitIHaveVuln;
 
-/// <summary>An axis-aligned rectangle in screen units, without Godot, for the placement rules.</summary>
+/// <summary>An axis-aligned rectangle in screen units, without Godot, for the card cloud and hand preview placement rules.</summary>
 internal readonly record struct Box(float X, float Y, float Width, float Height)
 {
     internal float Right => X + Width;

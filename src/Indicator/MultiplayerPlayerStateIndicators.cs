@@ -249,12 +249,17 @@ internal static class MultiplayerPlayerStateIndicators
         private const double SpeechSeconds = 4.0;
         // The dimmed icon: darker and half transparent, a starting point for the owner's judgement in game.
         private static readonly Color DimmedModulate = new(0.6f, 0.6f, 0.6f, 0.55f);
+        // Made once: a string passed as a theme name becomes a new StringName on every call.
+        private static readonly StringName FontName = "font";
+        private static readonly StringName FontSizeName = "font_size";
         private readonly NMultiplayerPlayerState _row;
         private readonly HBoxContainer _topContainer;
         private readonly Control? _hpBar;
-        private readonly Control _portrait;
         // The health bar and the portrait, kept in one array, because the placement reads them every frame.
         private readonly Control?[] _layoutParts;
+        // Each label's text width with what it was measured at, so the text is read and measured again only
+        // when its font size, width, or character count changes, not every frame.
+        private readonly Dictionary<ulong, (int FontSize, float Width, int Characters, float TextWidth)> _labelWidths = new();
         private readonly RowIndicatorState _state = new();
         private TextureRect? _icon;
         private SceneTree? _frameTree;
@@ -268,7 +273,6 @@ internal static class MultiplayerPlayerStateIndicators
             _topContainer = topContainer;
             // The visible bar, not the whole health bar node, which also holds the block badge.
             _hpBar = healthBar.HpBarContainer;
-            _portrait = portrait;
             _layoutParts = new Control?[] { _hpBar, portrait };
         }
 
@@ -293,12 +297,14 @@ internal static class MultiplayerPlayerStateIndicators
         internal void EndCombat()
         {
             _combatActive = false;
+            _labelWidths.Clear();
             Apply(_state.Reset());
         }
 
         public void Dispose()
         {
             _combatActive = false;
+            _labelWidths.Clear();
             Apply(_state.Reset());
             SetLook(IndicatorLevel.Off);
         }
@@ -337,7 +343,8 @@ internal static class MultiplayerPlayerStateIndicators
             var combatLive = _combatActive && combat.IsInProgress && !combat.IsOverOrEnding;
             var isAlive = player.Creature is { IsAlive: true };
             var isInPlayPhase = playerState?.Phase == PlayerTurnPhase.Play;
-            if (!combatLive || !_connected || !isAlive || !isInPlayPhase || playerState is null)
+            var mayShow = IndicatorRule.MayShow(combatLive, _connected, isAlive, isInPlayPhase);
+            if (!mayShow || playerState is null)
             {
                 return IndicatorLevel.Off;
             }
@@ -359,13 +366,12 @@ internal static class MultiplayerPlayerStateIndicators
                 }
             }
 
-            return IndicatorRule.Level(combatLive, _connected, isAlive, isInPlayPhase, holds, canPlay);
+            return IndicatorRule.Level(mayShow, holds, canPlay);
         }
 
         internal void RetryArrival()
         {
-            if (IsFull && SettingsService.Current is { ShowBubble: true } settings
-                && settings.ShownLevel(IndicatorLevel.Full, LocalContext.IsMe(_row.Player)) == IndicatorLevel.Full)
+            if (IsFull && SettingsService.Current.ShowBubble)
             {
                 ShowSpeechBubble(afterGameBubble: true);
             }
@@ -388,7 +394,7 @@ internal static class MultiplayerPlayerStateIndicators
                 Bubbles.LeftFull(_row.Player);
             }
 
-            if (committed.BecameFull && shown == IndicatorLevel.Full && settings.ShowBubble)
+            if (committed.BecameFull && settings.ShowBubble)
             {
                 ShowSpeechBubble(afterGameBubble: false);
             }
@@ -451,25 +457,25 @@ internal static class MultiplayerPlayerStateIndicators
             _icon = null;
         }
 
-        // Only while the card can still help a teammate: the row is a teammate's,
-        // its player has not ended the turn, and an enemy needs Vulnerable. Each outcome is logged, so a
-        // player's godot.log shows what the bubbles did, as it does for reactions.
+        // Only on a teammate's row, and only while the card can still help: its player has not ended the
+        // turn, and an enemy needs Vulnerable. The own row never speaks, so it is left out before anything
+        // is logged. Each teammate outcome is logged, so a player's godot.log shows what the bubbles did, as
+        // it does for reactions.
         private void ShowSpeechBubble(bool afterGameBubble)
         {
             var player = _row.Player;
             var creature = player.Creature;
-            if (creature is null || creature.IsDead)
+            if (LocalContext.IsMe(player) || creature is null || creature.IsDead)
             {
                 return;
             }
 
             var combat = creature.CombatState;
-            var isMe = LocalContext.IsMe(player);
-            var row = new HandReminderRow<Player>(player, isMe, true, CombatManager.Instance.IsPlayerReadyToEndTurn(player));
-            var outcome = HandReminderPolicy<Player, int>.SkipReason(row, Bubbles.EnemyNeedsVulnerable(combat)) is { } reason
+            var row = new HandReminderRow<Player>(player, false, true, CombatManager.Instance.IsPlayerReadyToEndTurn(player));
+            var outcome = ReminderRule.SkipReason(row, Bubbles.EnemyNeedsVulnerable(combat)) is { } reason
                 ? $"skipped, {reason}"
-                : Bubbles.Arrive(player, () => Bubbles.NextRow(combat, player), SpeechSeconds);
-            Log.Info($"[{ModEntry.ModId}] Arrival bubble{(afterGameBubble ? " after the game's bubble" : "")}: {outcome} ({(isMe ? "own" : "teammate")} row).");
+                : Bubbles.Arrive(player, () => Bubbles.NextRow(combat), SpeechSeconds);
+            Log.Info($"[{ModEntry.ModId}] Arrival bubble{(afterGameBubble ? " after the game's bubble" : "")}: {outcome}.");
         }
 
         // Powers tween in and the name label resizes its font without a layout signal on the row,
@@ -549,8 +555,9 @@ internal static class MultiplayerPlayerStateIndicators
         }
 
         // Global X of the rightmost drawn content under a control. The name label and the power
-        // container keep fixed widths, so their rects reach past the text and the power icons.
-        private static float? ContentRight(Control control)
+        // container keep fixed widths, so their rects reach past the text and the power icons. Runs every
+        // frame, so it walks the children by index: GetChildren would allocate a Godot array per node.
+        private float? ContentRight(Control control)
         {
             if (!control.Visible)
             {
@@ -564,9 +571,10 @@ internal static class MultiplayerPlayerStateIndicators
 
             float? right = null;
             var hasChildControls = false;
-            foreach (var child in control.GetChildren())
+            var count = control.GetChildCount();
+            for (var i = 0; i < count; i++)
             {
-                if (child is not Control childControl)
+                if (control.GetChild(i) is not Control childControl)
                 {
                     continue;
                 }
@@ -587,9 +595,11 @@ internal static class MultiplayerPlayerStateIndicators
             return rect.Size.X > 0f ? rect.End.X : null;
         }
 
-        private static float? LabelTextRight(Label label)
+        private float? LabelTextRight(Label label)
         {
-            if (string.IsNullOrEmpty(label.Text))
+            // Read without the text, which would be a new string on every read.
+            var characters = label.GetTotalCharacterCount();
+            if (characters == 0)
             {
                 return null;
             }
@@ -600,9 +610,16 @@ internal static class MultiplayerPlayerStateIndicators
                 return rect.End.X;
             }
 
-            var font = label.GetThemeFont("font");
-            var width = font.GetStringSize(label.Text, HorizontalAlignment.Left, -1f, label.GetThemeFontSize("font_size")).X;
-            return Mathf.Min(rect.End.X, (label.GetGlobalTransform() * new Vector2(width, 0f)).X);
+            var fontSize = label.GetThemeFontSize(FontSizeName);
+            var id = label.GetInstanceId();
+            if (!_labelWidths.TryGetValue(id, out var known) || known.FontSize != fontSize || known.Width != label.Size.X || known.Characters != characters)
+            {
+                var textWidth = label.GetThemeFont(FontName).GetStringSize(label.Text, HorizontalAlignment.Left, -1f, fontSize).X;
+                known = (fontSize, label.Size.X, characters, textWidth);
+                _labelWidths[id] = known;
+            }
+
+            return Mathf.Min(rect.End.X, (label.GetGlobalTransform() * new Vector2(known.TextWidth, 0f)).X);
         }
     }
 }

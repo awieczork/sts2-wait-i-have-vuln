@@ -9,16 +9,16 @@ namespace WaitIHaveVuln.Settings;
 /// what they see. Values from a file are read leniently: a missing or wrong-typed field takes its
 /// default, the icon scale is clamped and snapped to its step, and unknown fields are ignored.
 /// </summary>
-// ShowHandPreview has a default so that a file written before it existed reads with the preview on.
-internal sealed record PlayerSettings(int IconScalePercent, bool ShowBubble, bool ShowOnOwnRow, bool ShowHandReminder, bool VariedBubbleLines, bool ShowHandPreview = true)
+internal sealed record PlayerSettings(int IconScalePercent, bool ShowBubble, bool ShowOnOwnRow, bool ShowHandReminder, bool VariedBubbleLines, bool ShowHandPreview)
 {
     internal const int MinScalePercent = 50;
     // 150% of the 36-unit icon is about the largest size checked clear of the relic bar above the row.
     internal const int MaxScalePercent = 150;
     internal const int ScaleStepPercent = 10;
+    // Written to every file and not read yet: reserved for a future change of the format that needs a migration.
     private const int FormatVersion = 1;
 
-    internal static PlayerSettings Default { get; } = new(100, true, true, true, true);
+    internal static PlayerSettings Default { get; } = new(100, true, true, true, true, true);
 
     internal float IconScale => IconScalePercent / 100f;
 

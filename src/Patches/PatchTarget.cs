@@ -3,9 +3,10 @@ using MegaCrit.Sts2.Core.Logging;
 
 namespace WaitIHaveVuln.Patches;
 
-// Each patch class checks its target and the private fields it injects in Prepare, which Harmony runs
-// before it binds anything, so a game update that renames one skips only that class, with one line
-// that names the missing member and the feature that stays off, instead of a bind exception.
+// Each patch class checks its target and the private fields it injects in Prepare, which Harmony calls
+// first with no target (original is null) before it binds anything, so a game update that renames one
+// skips only that class, with one line that names the missing member and the feature that stays off,
+// instead of a bind exception.
 internal static class PatchTarget
 {
     internal static bool Exists(string patchClass, string feature, Type type, string method, Type[]? arguments = null, params string[] fields)

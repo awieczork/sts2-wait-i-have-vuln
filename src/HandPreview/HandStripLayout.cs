@@ -1,5 +1,3 @@
-using WaitIHaveVuln.Indicator;
-
 namespace WaitIHaveVuln.HandPreview;
 
 /// <summary>
@@ -7,7 +5,8 @@ namespace WaitIHaveVuln.HandPreview;
 /// its top-left corner at (<c>left</c>, <c>top</c>) and every card inside <c>bounds</c>. Cards keep
 /// <see cref="BaseScale"/> while they fit; a larger hand shrinks them down to <see cref="MinScale"/>, and
 /// past that the cards overlap so the strip still ends inside the bounds. A strip that would reach below
-/// the bounds moves up, but never above their top.
+/// the bounds moves up, but never above their top; one that starts too far right for a single card at
+/// <see cref="MinScale"/> moves left until that card fits.
 /// </summary>
 internal static class HandStripLayout
 {
@@ -20,7 +19,8 @@ internal static class HandStripLayout
 
     internal static HandStrip Place(int count, float left, float top, Box bounds, float cardWidth, float cardHeight)
     {
-        var available = Math.Max(0f, bounds.Right - left);
+        left = Math.Min(left, bounds.Right - cardWidth * MinScale);
+        var available = bounds.Right - left;
         var scale = BaseScale;
         if (count > 0)
         {

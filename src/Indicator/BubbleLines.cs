@@ -3,21 +3,19 @@ using System.Text;
 namespace WaitIHaveVuln.Indicator;
 
 /// <summary>
-/// The bubble lines, English only. <c>{you}</c> is the local player's name, <c>{them}</c> the
-/// speaking teammate's, and <c>{attacker}</c> that of the player whose Attack the teammate reacts to;
-/// a line whose name is missing is skipped.
+/// The bubble lines, English only. <c>{you}</c> is the local player's name and <c>{attacker}</c> that
+/// of the player whose Attack the teammate reacts to; a line whose name is missing is skipped.
 /// </summary>
 internal static class BubbleLines
 {
     internal const string Signature = "Wait! I have vuln!";
     internal const string You = "{you}";
-    internal const string Them = "{them}";
     internal const string Attacker = "{attacker}";
     // The one angry line with varied lines off.
     internal const string FixedAngry = "Nooo!";
     internal const int MaxNameLength = 16;
 
-    // First person, over the teammate's character, when a supported card arrives in their hand.
+    // First person, over the teammate's character, when the teammate's icon turns bright.
     internal static readonly IReadOnlyList<string> Row = new[]
     {
         Signature,
@@ -82,14 +80,13 @@ internal static class BubbleLines
     }
 
     /// <summary>The line with its names filled in, or null when a name it needs is missing.</summary>
-    internal static string? Fill(string line, string? you, string? them, string? attacker = null)
+    internal static string? Fill(string line, string? you, string? attacker = null)
     {
-        if ((line.Contains(You, StringComparison.Ordinal) && you is null) || (line.Contains(Them, StringComparison.Ordinal) && them is null)
-            || (line.Contains(Attacker, StringComparison.Ordinal) && attacker is null))
+        if ((line.Contains(You, StringComparison.Ordinal) && you is null) || (line.Contains(Attacker, StringComparison.Ordinal) && attacker is null))
         {
             return null;
         }
 
-        return line.Replace(You, you, StringComparison.Ordinal).Replace(Them, them, StringComparison.Ordinal).Replace(Attacker, attacker, StringComparison.Ordinal);
+        return line.Replace(You, you, StringComparison.Ordinal).Replace(Attacker, attacker, StringComparison.Ordinal);
     }
 }

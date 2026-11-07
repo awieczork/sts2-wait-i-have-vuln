@@ -6,7 +6,6 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
-using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
@@ -21,10 +20,10 @@ using WaitIHaveVuln.Settings;
 namespace WaitIHaveVuln.Indicator;
 
 /// <summary>
-/// The card reminder and the teammates' reactions, from the rules in
-/// <see cref="HandReminderPolicy{TPlayer, TTurn}"/>: one cloud with the Vulnerable icon at the hovered
-/// Attack while any teammate is needed, placed by <see cref="CloudPlacement"/> once the card has
-/// settled, never moved, and gone with the hover; and a line over a needed teammate when another
+/// The card reminder and the teammates' reactions, from the rules in <see cref="ReminderRule"/>: one
+/// cloud with the Vulnerable icon at the hovered Attack while any teammate is needed, shown at once
+/// beside the spot the card slides to (<see cref="CloudPlacement"/>), moved with the slide, checked once
+/// more after the card settles, and gone with the hover; and a line over a needed teammate when another
 /// player plays an Attack. Your own row never counts.
 /// </summary>
 internal static class HandReminders
@@ -47,12 +46,15 @@ internal static class HandReminders
     }
 
     private static readonly ConditionalWeakTable<NPlayerHand, Reminder> Reminders = new();
+    // The reactions' per-turn counts, one per combat, so they hold neither the hand nor a past combat.
+    private static readonly ConditionalWeakTable<ICombatState, HandReminderPolicy<Player, ReactionTurn>> Reactions = new();
     // The measured box of each cloud side, with the screen size it was measured at; the cloud never changes size otherwise.
     private static (Rect2 Left, Rect2 Right, Vector2 Viewport)? _knownBoxes;
-    private static Func<NPlayerHand, bool>? _areCardActionsAllowed;
+    private static Func<NPlayerHand, bool>? _canPlayCards;
     private static bool _gateResolved;
     private static FieldInfo? _activeTipsField;
     private static bool _activeTipsResolved;
+    private static bool _noCloudLogged;
 
     internal static void OnLocalCardHovered(NPlayerHand hand, CombatState? combatState)
     {
@@ -68,7 +70,7 @@ internal static class HandReminders
 
             // Every hovered Attack that does not apply Vulnerable is watched while it stays hovered, so the
             // cloud comes and goes as teammates become needed or not; the rest of the rule is checked there.
-            if (card.Type == CardType.Attack && !SupportedCards.IsSupported(card))
+            if (ReminderRule.IsReminderCard(card.Type == CardType.Attack, SupportedCards.IsSupported(card)))
             {
                 reminder.Pend(holder, combatState);
             }
@@ -86,25 +88,28 @@ internal static class HandReminders
         });
     }
 
-    internal static void OnAttackPlayed(Player attacker, ICombatState? combat, Creature? target)
+    // Every card play on this client, the teammates' included; only the Attacks of ReminderRule.CountsAsAttack
+    // make a needed teammate react.
+    internal static void OnCardPlayStarted(ICombatState? combat, CardPlay play)
     {
-        HookGuard.Run(nameof(OnAttackPlayed), "no teammate reacts to the Attack", () =>
+        HookGuard.Run(nameof(OnCardPlayStarted), "no teammate reacts to the Attack", () =>
         {
-            if (!SettingsService.Current.ShowBubble || combat is null || NPlayerHand.Instance is not { } hand)
+            if (!SettingsService.Current.ShowBubble || combat is null || play.Card is not { Owner: { } attacker } card
+                || !ReminderRule.CountsAsAttack(play.IsFirstInSeries, play.IsAutoPlay, card.Type == CardType.Attack, SupportedCards.IsSupported(card)))
             {
                 return;
             }
 
             // CardPlay.Target is set only for one-enemy and one-ally cards; an ally target is a player, not an enemy.
+            var target = play.Target;
             var targetsOneEnemy = target is { IsEnemy: true };
             var hitsNeedingEnemy = VulnerableNeed.AttackHitsNeedingEnemy(targetsOneEnemy, targetsOneEnemy && Bubbles.NeedsVulnerable(target!),
                 Bubbles.EnemyNeedsVulnerable(combat));
             var turn = ReactionTurn.Of(combat.RoundNumber, combat.Players.Select(player => player.PlayerCombatState?.TurnNumber ?? 0));
-            var reminder = Reminders.GetValue(hand, _ => new Reminder(hand));
-            foreach (var (player, count) in reminder.Reactions.AttackPlayed((combat, turn), attacker, hitsNeedingEnemy,
-                MultiplayerPlayerStateIndicators.ReminderRows(live: true)))
+            var reactions = Reactions.GetValue(combat, _ => new HandReminderPolicy<Player, ReactionTurn>());
+            foreach (var (player, count) in reactions.AttackPlayed(turn, attacker, hitsNeedingEnemy, MultiplayerPlayerStateIndicators.ReminderRows(live: true)))
             {
-                if (Bubbles.React(player, () => Bubbles.NextAngry(combat, player, attacker, count), ReactionSeconds) is not null)
+                if (Bubbles.React(player, () => Bubbles.NextAngry(combat, attacker, count), ReactionSeconds) is not null)
                 {
                     Log.Info($"[{ModEntry.ModId}] Reaction: tier {BubbleVoice.AngryTier(count) + 1}, Attack {count} this turn.");
                 }
@@ -112,41 +117,42 @@ internal static class HandReminders
         });
     }
 
-    // A won combat empties the enemies and discards the hand; IsInProgress stays true until the win is checked.
-    private static bool CombatOver(CombatState combat)
+    // IsInProgress stays true until a win is checked. A won combat also empties the enemies, which the
+    // cloud rule already covers: no enemy is left that needs Vulnerable.
+    private static bool CombatOver()
     {
         var manager = CombatManager.Instance;
-        return !manager.IsInProgress || manager.IsOverOrEnding || combat.HittableEnemies.Count == 0;
+        return !manager.IsInProgress || manager.IsOverOrEnding;
     }
 
-    // The game's own check for playing a card from the hand (NPlayerHand.CanPlayCards, private: no card play in
-    // progress and card actions allowed), no open overlay, and the local player's own Play phase, which
-    // starts after the turn-start draw.
+    // The game's own check for playing a card from the hand, no open overlay, and the local player's own
+    // Play phase, which starts after the turn-start draw.
     private static bool CanAct(NPlayerHand hand, CombatState combat)
     {
-        return !hand.InCardPlay && CardActionsAllowed(hand) && (NOverlayStack.Instance?.ScreenCount ?? 0) == 0
+        return CanPlayCards(hand) && (NOverlayStack.Instance?.ScreenCount ?? 0) == 0
             && LocalContext.GetMe(combat)?.PlayerCombatState?.Phase == PlayerTurnPhase.Play;
     }
 
-    // The game's own gate for card actions (private), resolved once; when a game update renames
+    // The hand in its play mode and the game's own check for playing a card from it (NPlayerHand.CanPlayCards,
+    // private: no card play in progress and card actions allowed), resolved once; when a game update renames
     // it, the card reminder stays off with one warning.
-    private static bool CardActionsAllowed(NPlayerHand hand)
+    private static bool CanPlayCards(NPlayerHand hand)
     {
         if (!_gateResolved)
         {
             _gateResolved = true;
-            var method = AccessTools.Method(typeof(NPlayerHand), "AreCardActionsAllowed");
+            var method = AccessTools.Method(typeof(NPlayerHand), "CanPlayCards");
             if (method is null)
             {
-                Log.Warn($"[{ModEntry.ModId}] NPlayerHand.AreCardActionsAllowed not found; the card reminder stays off.");
+                Log.Warn($"[{ModEntry.ModId}] NPlayerHand.CanPlayCards not found; the card reminder stays off.");
             }
             else
             {
-                _areCardActionsAllowed = AccessTools.MethodDelegate<Func<NPlayerHand, bool>>(method);
+                _canPlayCards = AccessTools.MethodDelegate<Func<NPlayerHand, bool>>(method);
             }
         }
 
-        return hand.CurrentMode == NPlayerHand.Mode.Play && (_areCardActionsAllowed?.Invoke(hand) ?? false);
+        return hand.CurrentMode == NPlayerHand.Mode.Play && (_canPlayCards?.Invoke(hand) ?? false);
     }
 
     /// <summary>The on-screen bounding box of a control, with its scale and rotation, or null when it has no size.</summary>
@@ -243,10 +249,8 @@ internal static class HandReminders
                 Step();
                 _stepDone = true;
             };
-            hand.TreeExiting += Clear;
+            hand.TreeExiting += () => HookGuard.Run("Hand exit", "the clouds stay until freed", Clear);
         }
-
-        internal HandReminderPolicy<Player, (ICombatState, ReactionTurn)> Reactions { get; } = new();
 
         internal void Pend(NHandCardHolder holder, CombatState combat)
         {
@@ -305,6 +309,19 @@ internal static class HandReminders
                     }
 
                     PrepareClouds();
+                    // Without both clouds (no Vulnerable texture, no parent for the hand) nothing can be
+                    // measured, and the hover would wait here every frame until it ends.
+                    if (_tailLeft is null || _tailRight is null)
+                    {
+                        if (!_noCloudLogged)
+                        {
+                            _noCloudLogged = true;
+                            Log.Info($"[{ModEntry.ModId}] Card reminder: the cloud could not be created; no cloud shows.");
+                        }
+
+                        Clear();
+                        return;
+                    }
                 }
 
                 // The cloud's size never changes, so it is measured on the first hover only (or after the screen
@@ -361,7 +378,7 @@ internal static class HandReminders
         private bool IsNeeded(CombatState combat)
         {
             return _holder?.CardNode?.Model is { } card
-                && HandReminderPolicy<Player, int>.ShowsCloud(true, false, card.CanPlay(), CanAct(_hand, combat) && !CombatOver(combat),
+                && ReminderRule.ShowsCloud(card.CanPlay(), CanAct(_hand, combat) && !CombatOver(),
                     Bubbles.EnemyNeedsVulnerable(combat), MultiplayerPlayerStateIndicators.ReminderRows(live: false));
         }
 
@@ -567,6 +584,8 @@ internal static class HandReminders
     // their sizes only when Godot lays them out.
     private sealed class Cloud
     {
+        // The game draws the thought cloud larger than the speech bubble; this brings it to about the same size.
+        private const float CloudScale = 0.55f;
         private const int MaxDescribedParts = 12;
         private readonly Control _root;
         private readonly Control _bubble;
@@ -600,7 +619,7 @@ internal static class HandReminders
             var root = new Control
             {
                 MouseFilter = Control.MouseFilterEnum.Ignore,
-                Scale = new Vector2(Bubbles.CloudScale, Bubbles.CloudScale),
+                Scale = new Vector2(CloudScale, CloudScale),
                 Modulate = new Color(1f, 1f, 1f, 0f)
             };
             parent.AddChild(root);

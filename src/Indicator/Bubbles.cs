@@ -22,8 +22,6 @@ namespace WaitIHaveVuln.Indicator;
 /// </summary>
 internal static class Bubbles
 {
-    // The game draws the thought cloud larger than the speech bubble; this brings it to about the same size.
-    internal const float CloudScale = 0.55f;
     private static readonly Random Random = new();
     private static readonly BubbleBoard Board = new();
     private static readonly BubbleVoice Voice = new(Random);
@@ -39,8 +37,8 @@ internal static class Bubbles
 
     internal static double Now => Time.GetTicksMsec() / 1000.0;
 
-    /// <summary>True while the mod creates its own speech bubble, so the game-bubble patch skips it.</summary>
-    internal static bool CreatingOwn { get; private set; }
+    /// <summary>True while the mod creates its own speech bubble, so <see cref="OnGameBubbleCreated"/> ignores it.</summary>
+    private static bool CreatingOwn { get; set; }
 
     /// <summary>Whether a hittable enemy still needs Vulnerable (<see cref="VulnerableNeed"/>); hittable already means alive and not shielded from hits.</summary>
     internal static bool EnemyNeedsVulnerable(ICombatState? combat)
@@ -53,14 +51,14 @@ internal static class Bubbles
         return VulnerableNeed.Of(enemy.HasPower<VulnerablePower>(), enemy.HasPower<ArtifactPower>());
     }
 
-    internal static BubbleLine? NextRow(ICombatState? combat, Player speaker)
+    internal static BubbleLine? NextRow(ICombatState? combat)
     {
-        return Voice.NextRow(SettingsService.Current.VariedBubbleLines, combat, IsOnScreen, YourName(combat, speaker), NameOf(speaker));
+        return Voice.NextRow(SettingsService.Current.VariedBubbleLines, combat, IsOnScreen, YourName(combat));
     }
 
-    internal static BubbleLine? NextAngry(ICombatState? combat, Player speaker, Player attacker, int attackCount)
+    internal static BubbleLine? NextAngry(ICombatState? combat, Player attacker, int attackCount)
     {
-        return Voice.NextAngry(SettingsService.Current.VariedBubbleLines, attackCount, IsOnScreen, YourName(combat, speaker), NameOf(speaker), NameOf(attacker));
+        return Voice.NextAngry(SettingsService.Current.VariedBubbleLines, attackCount, IsOnScreen, YourName(combat), NameOf(attacker));
     }
 
     /// <summary>The arrival bubble: shows now, or waits while a game bubble shows over the player. Returns what happened, for the log.</summary>
@@ -77,7 +75,7 @@ internal static class Bubbles
     /// <summary>A reaction line, dropped while a game bubble shows over the player. Returns the line shown, or null.</summary>
     internal static BubbleLine? React(Player speaker, Func<BubbleLine?> pick, double seconds)
     {
-        return ArrivalQueue<Player>.MayReact(IsGameBubbleShowing(speaker.Creature)) ? Say(speaker, pick, seconds, Kind.Reaction) : null;
+        return IsGameBubbleShowing(speaker.Creature) ? null : Say(speaker, pick, seconds, Kind.Reaction);
     }
 
     /// <summary>The player's icon left full: their arrival bubble, shown or waiting, has nothing left to announce.</summary>
@@ -125,7 +123,7 @@ internal static class Bubbles
         bubble.TreeExiting += () => HookGuard.Run("Game bubble ended", "a waiting arrival bubble stays unsaid", () => GameBubbleEnded(creature, bubble));
     }
 
-    internal static bool IsGameBubbleShowing(Creature? creature)
+    private static bool IsGameBubbleShowing(Creature? creature)
     {
         return creature is not null && GameBubbles.TryGetValue(creature, out var game) && game.IsShowing;
     }
@@ -190,7 +188,7 @@ internal static class Bubbles
     }
 
     /// <summary>A player's name for a bubble, as the player list shows it. Null when it cannot be read.</summary>
-    internal static string? NameOf(Player player)
+    private static string? NameOf(Player player)
     {
         try
         {
@@ -202,14 +200,9 @@ internal static class Bubbles
         }
     }
 
-    // The local player's name, except on their own row, where they would address themselves.
-    private static string? YourName(ICombatState? combat, Player speaker)
+    // The local player's name; only a teammate speaks, so the line addresses you.
+    private static string? YourName(ICombatState? combat)
     {
-        if (LocalContext.IsMe(speaker))
-        {
-            return null;
-        }
-
         return combat is not null && LocalContext.GetMe(combat) is { } me ? NameOf(me) : null;
     }
 

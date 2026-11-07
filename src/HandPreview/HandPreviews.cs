@@ -22,7 +22,7 @@ internal static class HandPreviews
         {
             if (Previews.TryGetValue(row, out var preview))
             {
-                preview.EndCombat();
+                preview.Stop();
             }
         });
     }
@@ -33,7 +33,7 @@ internal static class HandPreviews
         {
             if (Previews.TryGetValue(row, out var preview))
             {
-                preview.Dispose();
+                preview.Stop();
                 Previews.Remove(row);
             }
         });

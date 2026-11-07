@@ -23,15 +23,15 @@ internal sealed class BubbleVoice
         return Math.Clamp(attackCount, 1, BubbleLines.Angry.Count) - 1;
     }
 
-    /// <summary>The line when a supported card arrives in a teammate's hand; each combat opens with the signature.</summary>
-    internal BubbleLine? NextRow(bool varied, object? combat, Func<BubbleLine, bool> isOnScreen, string? you, string? them)
+    /// <summary>The line when a teammate's icon turns bright; each combat opens with the signature.</summary>
+    internal BubbleLine? NextRow(bool varied, object? combat, Func<BubbleLine, bool> isOnScreen, string? you)
     {
-        return varied ? _row.Next(combat, isOnScreen, you, them) : new BubbleLine(BubbleLines.Signature);
+        return varied ? _row.Next(combat, isOnScreen, you) : new BubbleLine(BubbleLines.Signature);
     }
 
     /// <summary>The teammate's line for another player's Attack, by the count of such Attacks this turn.</summary>
-    internal BubbleLine? NextAngry(bool varied, int attackCount, Func<BubbleLine, bool> isOnScreen, string? you, string? them, string? attacker)
+    internal BubbleLine? NextAngry(bool varied, int attackCount, Func<BubbleLine, bool> isOnScreen, string? you, string? attacker)
     {
-        return varied ? _angry[AngryTier(attackCount)].Next(null, isOnScreen, you, them, attacker) : new BubbleLine(BubbleLines.FixedAngry);
+        return varied ? _angry[AngryTier(attackCount)].Next(null, isOnScreen, you, attacker) : new BubbleLine(BubbleLines.FixedAngry);
     }
 }
