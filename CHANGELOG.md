@@ -5,12 +5,13 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## Unreleased
 
+## [0.4.0] - 2026-11-07
+
 ### Added
 
 - Hovering the card count on a teammate's row in the co-op player list shows their hand as small cards beside the list, in the order they hold them.
 - The Teammate hand preview option in Mod Settings turns the hand preview off.
-- The mod list describes the hand preview.
-- The log has a `[WaitIHaveVuln] Arrival bubble:` line for each "Wait! I have vuln!" bubble: shown, waiting for the game's bubble, or skipped with the reason.
+- The mod list describes every feature: the icon, the bubble over teammates, the card reminder, the reactions, and the hand preview.
 
 ### Removed
 
@@ -101,6 +102,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 - A "Wait! I have vuln!" speech bubble appears over a player's character for four seconds when their Vulnerable icon turns on.
 - The game mod list identifies the mod as `wait-i-have-vuln`.
 
+[0.4.0]: https://github.com/awieczork/sts2-wait-i-have-vuln/releases/tag/v0.4.0
 [0.3.2]: https://github.com/awieczork/sts2-wait-i-have-vuln/releases/tag/v0.3.2
 [0.3.1]: https://github.com/awieczork/sts2-wait-i-have-vuln/releases/tag/v0.3.1
 [0.3.0]: https://github.com/awieczork/sts2-wait-i-have-vuln/releases/tag/v0.3.0
