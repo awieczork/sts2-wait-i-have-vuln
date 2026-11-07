@@ -2,10 +2,10 @@
 
 When mods are on, Slay the Spire 2 keeps **separate modded save profiles**.
 The first time you play with mods, your unlocks, run history, and play preferences such as fast mode are not there.
-Your game settings, such as display, audio, and language, stay the same, because both modes share them.
+Your game settings, such as display, audio, and language, stay the same.
 Your normal saves are not changed and come back when you turn mods off.
 
-The game switches to the modded profiles even when a mod fails to load, so a broken mod alone is enough.
+The game uses the modded profiles even when a mod fails to load.
 In co-op, the lobby offers only the highest ascension that every player has unlocked.
 A fresh modded profile has none unlocked, so it can hold back your whole group until you copy your progress.
 
@@ -14,7 +14,7 @@ A run that is still in progress is not copied, so finish or abandon it first.
 
 ## Before you start: turn off Steam Cloud
 
-The game also syncs modded saves with Steam Cloud, which can overwrite the copied files with its own copies when the game starts.
+The game also syncs modded saves with Steam Cloud. Steam Cloud may overwrite the copied files when the game starts.
 Turn it off before copying:
 
 1. Close the game.
@@ -25,8 +25,8 @@ Keep your backup until you are sure everything is in place.
 
 ## Option A: use the script
 
-The [scripts](../scripts/) folder has the same script for PowerShell and Bash.
-It refuses to run while the game is open, asks you to confirm, backs up all your saves first, and then copies the files.
+The script comes in two versions, for PowerShell and for Bash.
+It refuses to run while the game is open, asks you to confirm, backs up your Steam account's saves first, and then copies the files.
 
 **Windows (PowerShell):** download [copy-vanilla-saves.ps1](../scripts/copy-vanilla-saves.ps1), open PowerShell in the folder where you saved it, and run:
 
@@ -42,7 +42,8 @@ bash copy-vanilla-saves.sh
 
 Both copy profile 1 by default.
 For another profile, add `-ProfileNumber 2` (PowerShell) or `--profile 2` (Bash).
-The backup goes to `%APPDATA%\SlayTheSpire2\save-backups\<date and time>`; you can move it anywhere afterwards.
+The backup goes to a `save-backups` folder next to the `steam` save folder, such as `%APPDATA%\SlayTheSpire2\save-backups\<date and time>` on Windows.
+You can move it anywhere afterwards.
 On Linux the save folder location has not been checked; if the script cannot find it, pass it with `--saves-root <folder>`.
 
 ## Option B: copy the files by hand

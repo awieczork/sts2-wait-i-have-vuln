@@ -2,7 +2,7 @@
 # Copies Slay the Spire 2 progress from a normal save profile into the matching modded profile.
 # Backs up the whole Steam account save folder first, then copies progress.save, prefs.save,
 # their .backup files, and the run history from profile<N>/saves to modded/profile<N>/saves.
-# Turn off Steam Cloud for the game before running it, or the game replaces the copied files on its next start.
+# Turn off Steam Cloud for the game before running it, or Steam Cloud may overwrite the copied files when the game next starts.
 set -euo pipefail
 
 usage() {
