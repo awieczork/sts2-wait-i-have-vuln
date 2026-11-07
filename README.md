@@ -1,10 +1,10 @@
 # Wait! I Have Vuln!
 
-A Slay the Spire 2 co-op mod for the moment your teammate swings first while you are holding Bash.
+A Slay the Spire 2 co-op mod for the moment your teammate swings first while you hold Bash.
 It shows who holds a card that applies Vulnerable, so your team applies it before the big hits.
-It also shows a teammate's hand when you hover their card count.
+Hover a teammate's card count to see their hand.
 
-![The Vulnerable icon next to a player's name in the co-op player list, and a "Wait! I have vuln!" speech bubble over their character](docs/images/icon-and-bubble.jpg)
+![The Vulnerable icon next to a teammate's name in the co-op player list, and "Wait! I have vuln!" in a speech bubble over their character](docs/images/hero.jpg)
 
 **Only the players who want to see it need the mod.** The host does not, and friends without it can still play with you.
 
@@ -16,35 +16,30 @@ It also shows a teammate's hand when you hover their card count.
 
 During a co-op combat:
 
-- **Vulnerable icon.** During your team's turn, the Vulnerable icon appears next to a player's name in the top-left player list while they hold a supported card. It is bright while they can play the card, and dimmed while they cannot, for example without the energy. Your own row is included.
-
-  ![The dimmed Vulnerable icon on a player's row while Bash is in hand with only 1 energy left](docs/images/dimmed-icon.jpg)
-
-- **"Wait! I have vuln!"** When a teammate's icon turns bright, for example when they draw Bash or gain the energy to play it, their character says so in a speech bubble for four seconds. Your own character stays quiet, because you already know what is in your hand. It shows only while an enemy still needs Vulnerable and the player has not ended their turn, and it goes away once they can no longer play the card. The first bubble of each combat is always "Wait! I have vuln!"; later ones vary, and some call you by name.
-- **Card reminder.** Hover an Attack you can play while a teammate's icon is bright, and a thought cloud with the Vulnerable icon appears beside your card and moves with it. Attacks that apply Vulnerable themselves get no cloud.
+- **Vulnerable icon.** A player's name in the top-left player list gets the Vulnerable icon while they hold a supported card. It is bright when they can play the card, and dimmed when they cannot, such as without the energy.
+- **"Wait! I have vuln!"** When a teammate's icon turns bright while an enemy still needs Vulnerable, their character says so in a speech bubble. The first bubble of each combat is always "Wait! I have vuln!"; later ones vary, and some call you by name.
+- **Card reminder.** Hover an Attack you can play while a teammate's icon is bright, and a thought cloud beside it reminds you to wait.
 
   ![A thought cloud with the Vulnerable icon beside a hovered Strike](docs/images/card-cloud.jpg)
 
-- **Teammates' reactions.** Play the Attack anyway at an enemy that still needs Vulnerable, and each teammate whose icon is bright reacts over their character. They get angrier with each such Attack in the turn, from "Nooo!" to "I HAD VULN!" to "I'm writing this down."
+- **Teammates' reactions.** Play the Attack anyway, and your teammate gets angrier with each one that turn, from "Nooo!" to "I HAD VULN!" to "I'm writing this down."
 
-  ![A teammate's character reacting with an angry speech bubble after an Attack](docs/images/reaction.jpg)
+  ![A teammate's character saying "We talked about this!" in a speech bubble](docs/images/reaction.jpg)
 
-- **Teammate's hand.** Hover the card count next to a teammate's name, and their hand appears as small cards to the right of the player list, in the order they hold them. It closes when the mouse leaves the card count, and it stays closed while you aim a card or a potion.
+- **Teammate's hand.** Hover the card count next to a teammate's name to see their hand.
+
+  ![A teammate's hand shown as a line of cards beside their name in the player list](docs/images/hand-preview.jpg)
 
 ### Settings
 
-Set these on the main menu before you start or continue a run, under **Settings > Mod Settings > Wait! I Have Vuln!**; the game greys out Mod Settings during a run. Use the mouse, because the keyboard cannot reach these settings.
+On the main menu, open **Settings > Mod Settings > Wait! I Have Vuln!** and use the mouse. The game locks these settings during a run.
 
-- **Show icon on my own row:** off hides everything on your own row.
+- **Show icon on my own row**
 - **Icon size:** 50% to 150%.
-- **Teammate hand preview:** off turns the hand preview off.
-- **Show bubbles:** off keeps only the icon, with no bubbles, cloud, or reactions.
-- **Card reminder:** off turns the thought cloud off.
-- **Varied bubble lines:** off keeps every bubble on one fixed line, "Wait! I have vuln!" or "Nooo!".
-
-Your choices are kept for the next game in `%APPDATA%\SlayTheSpire2\WaitIHaveVuln\settings.json`.
-
-![The mod's settings panel in Mod Settings, grouped under Player list, Bubbles, and Developer](docs/images/settings.jpg)
+- **Teammate hand preview**
+- **Show bubbles:** off also hides the thought cloud and the reactions.
+- **Card reminder**
+- **Varied bubble lines:** off keeps one line for each bubble, "Wait! I have vuln!" or "Nooo!".
 
 ### Supported cards
 
@@ -57,21 +52,19 @@ Your choices are kept for the next game in `%APPDATA%\SlayTheSpire2\WaitIHaveVul
 
 ## Good to know
 
-- **Each player sees it on their own screen only.** Your teammates see your icon only if they have the mod too.
-- **Mixed groups work.** The mod is marked as not affecting gameplay, so the game lets you join a host whose mods differ and only notes it in the log.
-- **A dimmed icon still matters.** The player holds the card but cannot play it now, for example without the energy, so a teammate's energy card or potion can still make it count.
-- **An enemy with Artifact does not count as needing Vulnerable,** because the card would only remove an Artifact, so it brings no bubble, cloud, or reaction.
-- **A disconnected player's row shows no icon.**
-- **The game's own bubbles come first.** A "Wait! I have vuln!" waits while the game shows a bubble over that character, and a reaction then is skipped.
+- **Your teammates see it only if they have the mod too.**
+- **A dimmed icon still matters.** Your energy card or potion can let that player play the card.
+- **Enemies with Artifact get no bubble, cloud, or reaction,** because Vulnerable would only remove the Artifact.
+- **The game's own speech bubbles come first,** so a bubble from the mod can wait or be skipped.
 - **The bubble text is always English.**
-- **The hand preview needs the mouse.** It does not open while you play with a controller.
+- **The hand preview needs a mouse;** it does not open with a controller.
 - **Needs game version 0.107.1 or newer.**
 - **Not tested yet:** Mad Science with the Sapping rider, the hand preview's numbers after a teammate's Strength, Weak, or cost changes, using the settings with a controller, macOS, Linux, and Steam Deck.
-- **Single-player looks the same as without the mod,** because the game shows the player list only in co-op.
+- **Single-player looks unchanged,** because the game shows the player list only in co-op.
 
 ## Install
 
-**Steam Workshop:** subscribe on the [Workshop page](https://steamcommunity.com/sharedfiles/filedetails/?id=3831970006) and start the game. The item is visible to the author's Steam friends only; everyone else can install by hand.
+**Steam Workshop:** subscribe on the [Workshop page](https://steamcommunity.com/sharedfiles/filedetails/?id=3831970006) and start the game.
 
 **By hand:**
 
